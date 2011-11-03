@@ -935,6 +935,7 @@ void __init msm_acpu_clock_init(struct msm_acpu_clock_platform_data *clkdata)
 	bus_init();
 
 	/* Improve boot time by ramping up CPUs immediately. */
+	/* set boot to 1.5 stock by default, needs testing if it works ~~~ */
 	for_each_online_cpu(cpu)
 		acpuclk_set_rate(cpu, 1512000, SETRATE_INIT);
 
