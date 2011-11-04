@@ -32,12 +32,6 @@
 #include <linux/gpio.h>
 #include <linux/pmic8058-xoadc.h>
 
-#if defined (CONFIG_USA_MODEL_SGH_T989) || defined (CONFIG_USA_MODEL_SGH_I727)
-static int skip_adc_read1=0;
-static int skip_adc_read2=0;
-static int skip_adc_read3=0;
-#endif
-
 /* MPP_CHECK_FEATURE is in sec_battery.h */
 /* ADJUST_RCOMP_WITH_TEMPER  : default, not used, refer to fuelguae source */
 #define ADC_QUEUE_FEATURE
@@ -60,12 +54,12 @@ static int skip_adc_read3=0;
 #if defined (CONFIG_USA_MODEL_SGH_I727)
 
 #if defined (CONFIG_PMIC8058_XOADC_CAL)
-#define CURRENT_OF_FULL_CHG_UI		2780    /* 278mA */
-#define CURRENT_OF_FULL_CHG		2780 	/* 278mA */
+#define CURRENT_OF_FULL_CHG_UI		2600    /* 260mA */
+#define CURRENT_OF_FULL_CHG		2600 	/* 260mA */
 #define RCOMP0_TEMP 			20 	/* 'C */
 #else
-#define CURRENT_OF_FULL_CHG_UI		2300    /* 278mA */
-#define CURRENT_OF_FULL_CHG		2300 	/* 278mA */
+#define CURRENT_OF_FULL_CHG_UI		2300    /* 260mA */
+#define CURRENT_OF_FULL_CHG		2300 	/* 260mA */
 #define RCOMP0_TEMP 			20 	/* 'C */
 #endif /* CONFIG_PMIC8058_XOADC_CAL */
 
@@ -115,25 +109,7 @@ static int skip_adc_read3=0;
 #else
 #define RECHARGING_VOLTAGE	(4130 * 1000)		/* 4.13 V */
 #endif
-
 #if defined (CONFIG_USA_MODEL_SGH_I727) || defined(CONFIG_USA_MODEL_SGH_I717)
-#if defined (CONFIG_PMIC8058_XOADC_CAL)
-#define HIGH_BLOCK_TEMP_ADC			706
-#define HIGH_RECOVER_TEMP_ADC			700
-#define EVT_HIGH_BLOCK_TEMP_ADC			707
-#define EVT_HIGH_RECOVER_TEMP_ADC		701
-#define LOW_BLOCK_TEMP_ADC			514
-#define LOW_RECOVER_TEMP_ADC			524
-
-#define NB_HIGH_BLOCK_TEMP_ADC			570
-#define NB_HIGH_RECOVER_TEMP_ADC		698
-#define NB_EVT_HIGH_BLOCK_TEMP_ADC		335
-#define NB_EVT_HIGH_RECOVER_TEMP_ADC		645
-#define NB_LOW_BLOCK_TEMP_ADC			1670
-#define NB_LOW_RECOVER_TEMP_ADC			1615
-
-#else
-
 #define HIGH_BLOCK_TEMP_ADC			706
 #define HIGH_RECOVER_TEMP_ADC			700
 #define EVT_HIGH_BLOCK_TEMP_ADC			707
@@ -147,7 +123,6 @@ static int skip_adc_read3=0;
 #define NB_EVT_HIGH_RECOVER_TEMP_ADC		560
 #define NB_LOW_BLOCK_TEMP_ADC			1610
 #define NB_LOW_RECOVER_TEMP_ADC			1535
-#endif /* CONFIG_PMIC8058_XOADC_CAL */
 
 #elif defined (CONFIG_USA_MODEL_SGH_T989D)
 #define HIGH_BLOCK_TEMP_ADC			626
@@ -594,18 +569,6 @@ static int sec_bat_check_detbat(struct sec_bat_info *info)
 		dev_err(info->dev, "%s: fail to get charger ps\n", __func__);
 		return -ENODEV;
 	}
-	
-#if defined (CONFIG_USA_MODEL_SGH_T989)	|| defined (CONFIG_USA_MODEL_SGH_I727)	
-	if (skip_adc_read2==0)
-	{
-		skip_adc_read2=1;
-		info->present = 1;
-		cancel_work_sync(&info->monitor_work);
-		wake_lock(&info->monitor_wake_lock);
-		queue_work(info->monitor_wqueue, &info->monitor_work);
-		return BAT_DETECTED;
-	}
-#endif	
 	
 #if defined(CONFIG_TARGET_LOCALE_USA)
 
@@ -1152,7 +1115,7 @@ static int sec_bat_read_adc(struct sec_bat_info *info, int channel,
 		goto out;
 	}
 
-	ret = wait_for_completion_timeout(&wait, 10*HZ);
+	ret = wait_for_completion_timeout(&wait, 5*HZ);
 	if (!ret) {
 		pr_err("%s: wait interrupted channel %d ret=%d\n",
 						__func__, channel, ret);
@@ -1363,29 +1326,7 @@ const int temper_table[][2] =  {
 	{ 243,		650	},
 };
 #endif /* CONFIG_PMIC8058_XOADC_CAL */
-#elif defined (CONFIG_USA_MODEL_SGH_I727) || defined (CONFIG_USA_MODEL_SGH_I717)
-#if defined (CONFIG_PMIC8058_XOADC_CAL)
-const int temper_table[][2] =  {
-	/* ADC, Temperature (C) */
-	{ 1755,		-100	}, 				
-	{ 1685,		-50	}, 				
-	{ 1605,		0	}, 
-	{ 1500,		50	},
-	{ 1405,		100	},
-	{ 1290,		150	},
-	{ 1170,		200	},
-	{ 1045,		250	},
-	{ 925,		300	},
-	{ 810,		350	},
-	{ 705,		400	},
-	{ 610,		450	},
-	{ 525,		500	},
-	{ 445,		550	},
-	{ 380,		600	},
-	{ 347,		630	},
-	{ 320,		650	},
-};
-#else
+#elif defined (CONFIG_USA_MODEL_SGH_I727)
 const int temper_table[][2] =  {
 	/* ADC, Temperature (C) */
 	{ 1630,		-50	}, 				
@@ -1404,7 +1345,17 @@ const int temper_table[][2] =  {
 	{ 305,		600	},
 	{ 232,		650	},
 };
-#endif /* CONFIG_PMIC8058_XOADC_CAL */
+#elif defined (CONFIG_USA_MODEL_SGH_I717)
+const int temper_table[][2] =  {
+	/* ADC, Temperature (C) */
+	{ 521,		-50	}, 				
+	{ 527,		0	}, 
+	{ 608,		400	},
+	{ 614,		430	},
+	{ 618,		450	},
+	{ 656,		650	},
+};
+
 #endif
 
 static int sec_bat_check_temper_adc_USA(struct sec_bat_info *info)
@@ -1546,18 +1497,6 @@ static int sec_bat_check_temper_adc_USA_nb(struct sec_bat_info *info)
 	int high_recover_temp_USA = NB_HIGH_BLOCK_TEMP_ADC;
 
 	int health = info->batt_health;
-
-#if defined (CONFIG_USA_MODEL_SGH_T989) || defined (CONFIG_USA_MODEL_SGH_I727)
-	if (skip_adc_read1==0)
-	{
-		info->batt_health=POWER_SUPPLY_HEALTH_GOOD;
-		skip_adc_read1=1;
-		cancel_work_sync(&info->monitor_work);
-		wake_lock(&info->monitor_wake_lock);
-		queue_work(info->monitor_wqueue, &info->monitor_work);
-		return 0;
-	}
-#endif	
 
 #ifdef ADC_QUEUE_FEATURE
 	if (sec_bat_get_adc_depot(info, CHANNEL_ADC_BATT_THERM,
@@ -2284,7 +2223,7 @@ static void sec_bat_cable_work(struct work_struct *work)
 			wake_lock_timeout(&info->vbus_wake_lock, 5 * HZ);
 			printk("%s : dock inserted, but dcin nok skip charging!\n",
 					__func__);
-			sec_bat_enable_charging(info, false);
+			sec_bat_enable_charging(info, true);
 			info->charging_enabled = false;
 			break;
 		}
@@ -2361,6 +2300,7 @@ static void sec_bat_charging_time_management(struct sec_bat_info *info)
 		break;
 	default:
 		info->is_timeout_chgstop = false;
+		dev_info(info->dev, "%s: Undefine Battery Status\n", __func__);
 		return;
 	}
 
@@ -2592,12 +2532,14 @@ static void sec_bat_measure_work(struct work_struct *work)
 #endif /* ADC_QUEUE_FEATURE */
 
 #if defined(CONFIG_TARGET_LOCALE_USA)
-#if defined (CONFIG_USA_MODEL_SGH_T989)
+#if defined(CONFIG_USA_MODEL_SGH_T989D)
+	if(get_hw_rev()>=0x01)
+#elif defined(CONFIG_USA_MODEL_SGH_T989)
 	if(get_hw_rev()>=0x06)
 #elif defined (CONFIG_USA_MODEL_SGH_I727)
 	if(get_hw_rev()>=0x08)
 #elif defined (CONFIG_USA_MODEL_SGH_I717)
-	if(true)        
+	if(false)        
 #endif
 		sec_bat_check_temper_adc_USA_nb(info);
 	else
@@ -2724,24 +2666,18 @@ static void sec_bat_adc_work(struct work_struct *work)
 		container_of(work, struct sec_bat_info, adc_work);
 	unsigned long flags;
 
-#if defined (CONFIG_USA_MODEL_SGH_T989) || defined (CONFIG_USA_MODEL_SGH_I727)
-	if (skip_adc_read3==0)
-	{
-		skip_adc_read3=1;
-		return;
-	}
-#endif	
-
 	//printk("%s : \n", __func__);
 	wake_lock(&info->adc_wake_lock);
 
 #if defined(CONFIG_TARGET_LOCALE_USA)
-#if defined (CONFIG_USA_MODEL_SGH_T989)
+#if defined(CONFIG_USA_MODEL_SGH_T989D)
+	if(get_hw_rev()>=0x01)
+#elif defined(CONFIG_USA_MODEL_SGH_T989)
 	if(get_hw_rev()>=0x06)
 #elif defined (CONFIG_USA_MODEL_SGH_I727)
 	if(get_hw_rev()>=0x08)
 #elif defined (CONFIG_USA_MODEL_SGH_I717)
-	if(true)        
+	if(false)        
 #endif
 		channel = CHANNEL_ADC_BATT_THERM;
 	else
@@ -2770,7 +2706,7 @@ static void sec_bat_adc_work(struct work_struct *work)
 		}
 	}
 
-#if defined(CONFIG_TARGET_LOCALE_USA)
+#if defined(CONFIG_TARGET_LOCALE_USA) && !defined(CONFIG_USA_MODEL_SGH_I717)
 	channel = CHANNEL_ADC_BATT_ID;
 	ret = sec_bat_read_adc(info, channel, &adc_data, &adc_physical);
 	if (ret) {
@@ -2998,12 +2934,14 @@ static ssize_t sec_bat_show_property(struct device *dev,
 		*/
 #endif	/* ADC_QUEUE_FEATURE */	
 #if defined(CONFIG_TARGET_LOCALE_USA)
-#if defined(CONFIG_USA_MODEL_SGH_T989)
+#if defined(CONFIG_USA_MODEL_SGH_T989D)
+		if(get_hw_rev()>=0x01)
+#elif defined(CONFIG_USA_MODEL_SGH_T989)
 		if(get_hw_rev()>=0x06)
 #elif defined(CONFIG_USA_MODEL_SGH_I727)
 		if(get_hw_rev()>=0x08) 
 #elif defined(CONFIG_USA_MODEL_SGH_I717)
-		if(true)
+        if(false)
 #endif
 		{
 #ifdef ADC_QUEUE_FEATURE
@@ -3417,7 +3355,7 @@ static int sec_bat_read_proc(char *buf, char **start,
 static void sec_bat_early_suspend(struct early_suspend *handle)
 {
 	struct sec_bat_info *info = container_of(handle, struct sec_bat_info,
-						 bat_early_suspend);
+										bat_early_suspend);
 	
 	printk("%s...\n", __func__);
 	info->is_esus_state = true;
@@ -3428,12 +3366,7 @@ static void sec_bat_early_suspend(struct early_suspend *handle)
 static void sec_bat_late_resume(struct early_suspend *handle)
 {
 	struct sec_bat_info *info = container_of(handle, struct sec_bat_info,
-						 bat_early_suspend);
-#if defined (CONFIG_USA_MODEL_SGH_T989) || defined (CONFIG_USA_MODEL_SGH_I727)
-	skip_adc_read1=0;
-	skip_adc_read2=0;
-	skip_adc_read3=0;
-#endif	
+										bat_early_suspend);
 	printk("%s...\n", __func__);
 	info->is_esus_state = false;
 
@@ -3809,11 +3742,6 @@ static int sec_bat_resume(struct device *dev)
 {
 	struct sec_bat_info *info = dev_get_drvdata(dev);
 
-#if defined (CONFIG_USA_MODEL_SGH_T989) || defined (CONFIG_USA_MODEL_SGH_I727)
-	skip_adc_read1=0;
-	skip_adc_read2=0;
-	skip_adc_read3=0;
-#endif	
 	queue_delayed_work(info->monitor_wqueue,
 							&info->measure_work, 0);
 

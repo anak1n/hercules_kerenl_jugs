@@ -71,10 +71,6 @@ static int simple_control; /* Count of simple controls*/
 static int src_dev;
 static int dst_dev;
 static int loopback_status;
-static u32 opened_dev1 = -1;
-static u32 opened_dev2 = -1;
-static int last_active_rx_opened_dev = -1;
-static int last_active_tx_opened_dev = -1;
 
 static int msm_scontrol_count_info(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_info *uinfo)
@@ -348,10 +344,9 @@ static int msm_device_put(struct snd_kcontrol *kcontrol,
 		rc = PTR_ERR(dev_info);
 		return rc;
 	}
-	pr_info("%s:device %s(%d) set %d : opened_dev(%d,%d)\n", __func__, dev_info->name, route_cfg.dev_id, set, opened_dev1, opened_dev2);
+	pr_info("%s:device %s set %d\n", __func__, dev_info->name, set);
 
 	if (set) {
-		pr_info("Device %s Opened = %d\n", dev_info->name, dev_info->opened);
 		if (!dev_info->opened) {
 #if defined(CONFIG_USA_MODEL_SGH_T989 ) || defined(CONFIG_USA_MODEL_SGH_I727) \
   || defined(CONFIG_USA_MODEL_SGH_I717)
@@ -381,107 +376,12 @@ static int msm_device_put(struct snd_kcontrol *kcontrol,
 			}
 			dev_info->set_sample_rate = rc;
 			rc = 0;
-			pr_info("Device trying to open : %s\n", dev_info->name);
 			rc = dev_info->dev_ops.open(dev_info);
 			if (rc < 0) {
-/*[[Safeguard code for device open issue -START //balaji.k	
-     This fix would work incase of EBUSY error when device is being opened & previous instance of device is not closed */
-				if(rc == -EBUSY)
-				{
-				
-					struct msm_snddev_info * last_dev_info;
-					int closing_dev = -1;
-					pr_err("DEV_BUSY: Ebusy Error %s : route_cfg.dev_id 1: %d\n",  __func__, route_cfg.dev_id);
-//Closing the last active device after sending the broadcast
-					if (dev_info->capability & SNDDEV_CAP_TX)
-					{
-						last_dev_info = audio_dev_ctrl_find_dev(last_active_tx_opened_dev);
-						closing_dev = last_active_tx_opened_dev;
-					}
-					if (dev_info->capability & SNDDEV_CAP_RX)
-					{
-						last_dev_info = audio_dev_ctrl_find_dev(last_active_rx_opened_dev);
-						closing_dev = last_active_rx_opened_dev;
-					}
-
-						
-					broadcast_event(AUDDEV_EVT_REL_PENDING,
-						closing_dev,
-						SESSION_IGNORE);
-					pr_err("DEV_BUSY:closing Last active Open dev (%d)\n",  closing_dev);
-					rc = dev_info->dev_ops.close(last_dev_info);
-					pr_err("DEV_BUSY: %s : route_cfg.dev_id 2: %d\n", __func__, route_cfg.dev_id);
-					
-					if (rc < 0) {
-						pr_err("DEV_BUSY  : %s:Snd device failed close!\n", __func__);
-						return rc;
-					}
-					else
-					{
-					//Device close is successful, so broadcasting release event. 
-						//if(opened_dev1 == route_cfg.dev_id)    // Commented these as here we are closing the previous device 
-							opened_dev1 = -1;
-						//else if(opened_dev2 == route_cfg.dev_id)
-							opened_dev2 = -1;
-						last_dev_info->opened= 0;
-						broadcast_event(AUDDEV_EVT_DEV_RLS,
-							closing_dev,
-							SESSION_IGNORE);
-					}
-					
-					dev_info = audio_dev_ctrl_find_dev(route_cfg.dev_id);
-					if (IS_ERR(dev_info)) {
-						pr_err("DEV_BUSY: %s:pass invalid dev_id\n", __func__);
-						rc = PTR_ERR(dev_info);
-						return rc;
-					}
-
-					pr_err("DEV_BUSY: Opening the Device Now %s : route_cfg.dev_id : %d\n", __func__, route_cfg.dev_id);
-					
-					rc = dev_info->dev_ops.open(dev_info); //Opening the intended device
-
-					if(rc < 0)
-					{
-						pr_err("DEV_BUSY: %s, Device %d:Enabling %s failed\n", __func__, rc, dev_info->name);
-						return rc;
-					}
-					else
-					{
-						// Maintaining the last Opened device- reqd for closing if EBUSY is encountered.
-						if (dev_info->capability & SNDDEV_CAP_TX)
-							last_active_tx_opened_dev = route_cfg.dev_id;
-						else if(dev_info->capability & SNDDEV_CAP_RX)
-							last_active_rx_opened_dev =  route_cfg.dev_id;
-
-						printk("Last active Open Txdev (%d) and Rxdev(%d)\n", last_active_tx_opened_dev,  last_active_rx_opened_dev);
-					}
-				}
-				else
-				{
-					pr_err("%s:Enabling %s failed\n",
-						__func__, dev_info->name);
-					return rc;
-				}
-
-			
-		}
-		else
-		{
-			 // Maintaining the last Opened device- reqd for closing if EBUSY is encountered.
-			if (dev_info->capability & SNDDEV_CAP_TX)
-				last_active_tx_opened_dev = route_cfg.dev_id;
-			else if(dev_info->capability & SNDDEV_CAP_RX)
-			 	last_active_rx_opened_dev =  route_cfg.dev_id;
-			
-			printk("Last active Open Txdev (%d) and Rxdev(%d)\n", last_active_tx_opened_dev,  last_active_rx_opened_dev);
-		}
-//Safeguard code for device open issue -END]] //balaji.k		
-			if(opened_dev1 == -1)
-				opened_dev1 = route_cfg.dev_id;
-			else
-				opened_dev2 = route_cfg.dev_id;
-			pr_info("%s:open done : opened_dev(%d,%d)\n", __func__, opened_dev1, opened_dev2);
-
+				pr_err("%s:Enabling %s failed\n",
+					__func__, dev_info->name);
+				return rc;
+			}
 			dev_info->opened = 1;
 			broadcast_event(AUDDEV_EVT_DEV_RDY, route_cfg.dev_id,
 							SESSION_IGNORE);
@@ -527,19 +427,12 @@ static int msm_device_put(struct snd_kcontrol *kcontrol,
 			broadcast_event(AUDDEV_EVT_REL_PENDING,
 						route_cfg.dev_id,
 						SESSION_IGNORE);
-			printk("Kuldeep: Device trying to close : %s\n", dev_info->name);			
 			rc = dev_info->dev_ops.close(dev_info);
 			if (rc < 0) {
 				pr_err("%s:Snd device failed close!\n",
 					__func__);
 				return rc;
 			} else {
-				if(opened_dev1 == route_cfg.dev_id)
-					opened_dev1 = -1;
-				else if(opened_dev2 == route_cfg.dev_id)
-					opened_dev2 = -1;
-				pr_info("%s:close done : opened_dev(%d,%d)\n", __func__, opened_dev1, opened_dev2);
-
 				dev_info->opened = 0;
 				broadcast_event(AUDDEV_EVT_DEV_RLS,
 					route_cfg.dev_id,

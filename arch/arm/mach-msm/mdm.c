@@ -36,7 +36,6 @@
 #include <linux/workqueue.h>
 #include <linux/clk.h>
 #include <linux/mfd/pmic8058.h>
-#include <linux/wakelock.h>
 #include <asm/mach-types.h>
 #include <asm/uaccess.h>
 #include <asm/clkdev.h>
@@ -51,8 +50,6 @@
 #include "devices.h"
 #include "clock.h"
 
-
-#define CHARM_MDM2AP_WAKEUP
 
 //Modem crash is observed many times during shutdown which is increasing the shutdown time
 // Total timeout during shutdown is reduced to 1 sec which reduces total shutdown
@@ -73,10 +70,6 @@ static enum charm_boot_type boot_type = CHARM_NORMAL_BOOT;
 static int charm_boot_status;
 static int charm_ram_dump_status;
 static struct workqueue_struct *charm_queue;
-#ifdef CHARM_MDM2AP_WAKEUP
-static int charm_wakeup_irq;
-static struct wake_lock charm_wakelock;
-#endif
 
 #define CHARM_DBG(...)	do { if (charm_debug_on) \
 					pr_info(__VA_ARGS__); \
@@ -298,17 +291,6 @@ static void charm_fatal_fn(struct work_struct *work)
 
 static DECLARE_WORK(charm_fatal_work, charm_fatal_fn);
 
-#ifdef CHARM_MDM2AP_WAKEUP
-static irqreturn_t charm_wakeup(int irq, void *dev_id)
-{
-	CHARM_DBG("%s: charm got wakeup interrupt\n", __func__);
-
-	wake_lock_timeout(&charm_wakelock, 30*HZ);
-
-	return IRQ_HANDLED;
-}
-#endif
-
 static irqreturn_t charm_errfatal(int irq, void *dev_id)
 {
 	CHARM_DBG("%s: charm got errfatal interrupt\n", __func__);
@@ -424,29 +406,6 @@ static int __init charm_modem_probe(struct platform_device *pdev)
 
 	ssr_register_subsystem(&charm_subsystem);
 
-#ifdef CHARM_MDM2AP_WAKEUP
-	gpio_request(MDM2AP_WAKEUP, "MDM2AP_WAKEUP");
-	gpio_direction_input(MDM2AP_WAKEUP);
-
-	wake_lock_init(&charm_wakelock, WAKE_LOCK_SUSPEND, "charm_wakelock");
-
-	charm_wakeup_irq = MSM_GPIO_TO_INT(MDM2AP_WAKEUP);
-
-	ret = request_irq(charm_wakeup_irq, charm_wakeup,
-		IRQF_TRIGGER_RISING , "charm wakeup", NULL);
-
-	if (ret < 0) {
-		pr_err("%s: MDM2AP_WAKEUP IRQ#%d request failed with error=%d\
-			. No IRQ will be generated on errfatal.",
-			__func__, irq, ret);
-		goto wakeup_err;
-	}
-
-	enable_irq_wake(charm_wakeup_irq);
-
-wakeup_err:
-#endif
-
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0) {
 		pr_err("%s: could not get MDM2AP_ERRFATAL IRQ resource. \
@@ -503,9 +462,6 @@ fatal_err:
 	gpio_free(MDM2AP_STATUS);
 	gpio_free(MDM2AP_ERRFATAL);
 	gpio_free(AP2MDM_WAKEUP);
-#ifdef CHARM_MDM2AP_WAKEUP
-	gpio_free(MDM2AP_WAKEUP);
-#endif
 	return ret;
 
 }
@@ -513,11 +469,6 @@ fatal_err:
 
 static int __devexit charm_modem_remove(struct platform_device *pdev)
 {
-#ifdef CHARM_MDM2AP_WAKEUP
-	wake_lock_destroy(&charm_wakelock);
-	gpio_free(MDM2AP_WAKEUP);
-#endif
-
 	gpio_free(AP2MDM_STATUS);
 	gpio_free(AP2MDM_ERRFATAL);
 	gpio_free(AP2MDM_KPDPWR_N);

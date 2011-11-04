@@ -129,6 +129,10 @@ static struct clock_state {
 	uint32_t			acpu_switch_time_us;
 	uint32_t			vdd_switch_time_us;
 	uint32_t			max_speed_delta_khz;
+	#ifdef CONFIG_SEC_DEBUG_DCVS_LOG
+	unsigned int		target_acpuclk_khz[NR_CPUS];
+	unsigned int		saved_vdd_sc[NR_CPUS];
+	#endif
 } drv_state;
 
 struct clkctl_l2_speed {
@@ -241,8 +245,9 @@ static struct clkctl_acpu_speed acpu_freq_tbl_fast[] = {
   { {1, 1}, 1566000,  ACPU_SCPLL, 0, 0, 1, 0x1D, L2(20), 1212500, 0x03006000},
   { {1, 1}, 1620000,  ACPU_SCPLL, 0, 0, 1, 0x1E, L2(20), 1212500, 0x03006000},
   { {1, 1}, 1674000,  ACPU_SCPLL, 0, 0, 1, 0x1F, L2(21), 1212500, 0x03006000},
-  { {1, 1}, 1782000,  ACPU_SCPLL, 0, 0, 1, 0x21, L2(22), 1275000, 0x03006000},
-  { {1, 1}, 1836000,  ACPU_SCPLL, 0, 0, 1, 0x22, L2(22), 1300000, 0x03006000},
+  { {1, 1}, 1728000,  ACPU_SCPLL, 0, 0, 1, 0x20, L2(21), 1225000, 0x03006000},
+  { {1, 1}, 1782000,  ACPU_SCPLL, 0, 0, 1, 0x21, L2(21), 1237500, 0x03006000},
+  { {1, 1}, 1836000,  ACPU_SCPLL, 0, 0, 1, 0x22, L2(22), 1250000, 0x03006000},
   { {0, 0}, 0 },
 };
 
@@ -426,6 +431,10 @@ static int increase_vdd(int cpu, unsigned int vdd_sc, unsigned int vdd_mem,
 {
 	int rc = 0;
 
+	#ifdef CONFIG_SEC_DEBUG_DCVS_LOG
+	drv_state.saved_vdd_sc[cpu] = vdd_sc;
+	#endif
+
 	/* Increase vdd_mem active-set before vdd_dig and vdd_sc.
 	 * vdd_mem should be >= both vdd_sc and vdd_dig. */
 	rc = rpm_vreg_set_voltage(RPM_VREG_ID_PM8058_S0,
@@ -500,11 +509,19 @@ static void decrease_vdd(int cpu, unsigned int vdd_sc, unsigned int vdd_mem,
 			__func__, cpu, ret);
 		return;
 	}
+
+	#ifdef CONFIG_SEC_DEBUG_DCVS_LOG
+	drv_state.saved_vdd_sc[cpu] = vdd_sc;
+	#endif
 }
 
 static void switch_sc_speed(int cpu, struct clkctl_acpu_speed *tgt_s)
 {
 	struct clkctl_acpu_speed *strt_s = drv_state.current_speed[cpu];
+
+	#ifdef CONFIG_SEC_DEBUG_DCVS_LOG
+	drv_state.target_acpuclk_khz[cpu] = tgt_s->acpuclk_khz;
+	#endif
 
 	if (strt_s->pll != ACPU_SCPLL && tgt_s->pll != ACPU_SCPLL) {
 		select_clk_source_div(cpu, tgt_s);
@@ -935,7 +952,6 @@ void __init msm_acpu_clock_init(struct msm_acpu_clock_platform_data *clkdata)
 	bus_init();
 
 	/* Improve boot time by ramping up CPUs immediately. */
-	/* set boot to 1.5 stock by default, needs testing if it works ~~~ */
 	for_each_online_cpu(cpu)
 		acpuclk_set_rate(cpu, 1512000, SETRATE_INIT);
 

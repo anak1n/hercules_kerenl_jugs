@@ -196,7 +196,7 @@ printk("%s: max %d, n %d 0x%x, w %d, h %d\n",__func__, max, ptr[0], (unsigned in
 		ptr += 2;
 		count -= 4;
 	}
-#if !defined (CONFIG_USA_MODEL_SGH_I727)
+#if !defined (CONFIG_USA_MODEL_SGH_I727) && !defined(CONFIG_USA_MODEL_SGH_T989D)
 	if (!is_lpcharging_state() && !sec_debug_is_recovery_mode())
 		s3cfb_start_progress(info);
 #endif

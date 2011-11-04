@@ -778,7 +778,7 @@ int gether_setup(struct usb_gadget *g, u8 ethaddr[ETH_ALEN])
 		return -ENOMEM;
 
 #if defined (CONFIG_USA_MODEL_SGH_I727)
-	net->mtu = 1410;
+	net->mtu = 1430;
 #endif
 
 	dev = netdev_priv(net);

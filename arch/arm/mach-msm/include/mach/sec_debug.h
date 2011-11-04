@@ -22,13 +22,14 @@ extern void sec_getlog_supply_kloginfo(void *klog_buf);
 
 extern void sec_gaf_supply_rqinfo(unsigned short curr_offset,
 				  unsigned short rq_offset);
-extern int sec_debug_is_enabled(void);
+extern int sec_debug_level(void);
+
+void sec_debug_list(void *entry);
 #else
 static inline int sec_debug_init(void)
 {
 }
 static inline int sec_debug_dump_stack(void) {}
-static inline void sec_debug_hw_reset(void){}
 static inline void sec_debug_check_crash_key(unsigned int code, int value) {}
 
 static inline void sec_getlog_supply_fbinfo(void *p_fb, u32 res_x, u32 res_y,
@@ -55,7 +56,10 @@ static inline void sec_gaf_supply_rqinfo(unsigned short curr_offset,
 					 unsigned short rq_offset)
 {
 }
-static inline int sec_debug_is_enabled(void) {return 0;}
+static inline int sec_debug_level(void) {}
+
+static inline void sec_debug_list(void *entry) {}
+
 #endif
 
 #ifdef CONFIG_SEC_DEBUG_SCHED_LOG

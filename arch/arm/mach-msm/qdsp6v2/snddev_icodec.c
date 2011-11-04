@@ -387,10 +387,6 @@ static int snddev_icodec_open_rx(struct snddev_icodec_state *icodec)
 
 	trc = afe_open(icodec->data->copp_id, &afe_config, icodec->sample_rate);
 
-	if (IS_ERR_VALUE(trc))
-		pr_err("%s: afe open failed, trc = %d\n", __func__, trc);
-	else
-		pr_err("%s: afe open success, trc = %d\n", __func__, trc);
 	/* Enable ADIE */
 	if (icodec->adie_path) {
 		adie_codec_proceed_stage(icodec->adie_path,
@@ -680,7 +676,6 @@ static int snddev_icodec_open(struct msm_snddev_info *dev_info)
 
 	if (icodec->data->capability & SNDDEV_CAP_RX) {
 		mutex_lock(&drv->rx_lock);
-		pr_err("%s: rx_active = %d\n", __func__, drv->rx_active);
 		if (drv->rx_active) {
 			mutex_unlock(&drv->rx_lock);
 			rc = -EBUSY;
@@ -689,15 +684,12 @@ static int snddev_icodec_open(struct msm_snddev_info *dev_info)
 		rc = snddev_icodec_open_rx(icodec);
 
 		if (!IS_ERR_VALUE(rc)) {
+			drv->rx_active = 1;
 			if ((icodec->data->dev_vol_type & (
 				SNDDEV_DEV_VOL_DIGITAL |
 				SNDDEV_DEV_VOL_ANALOG)))
-			/*As per QC's suggestion for SR 623568 , return value of  snddev_icodec_set_device_volume_impl
-			 * is ignored, which was causing device open failure*/
-			rc = snddev_icodec_set_device_volume_impl(dev_info, dev_info->dev_volume);
-				pr_err("%s: rx_active_vol = %d\n", __func__, drv->rx_active);
-			if(!IS_ERR_VALUE(rc))
-				drv->rx_active = 1;
+				rc = snddev_icodec_set_device_volume_impl(
+						dev_info, dev_info->dev_volume);
 		}
 		mutex_unlock(&drv->rx_lock);
 	} else if (icodec->data->capability & SNDDEV_CAP_LB) {
@@ -708,14 +700,13 @@ static int snddev_icodec_open(struct msm_snddev_info *dev_info)
 			if ((icodec->data->dev_vol_type & (
 				SNDDEV_DEV_VOL_DIGITAL |
 				SNDDEV_DEV_VOL_ANALOG)))
-				if ( snddev_icodec_set_device_volume_impl(dev_info, dev_info->dev_volume) < 0 ) 
-					printk(" snddev_icodec_set_device_volume_impl returns error\n"); 
+				rc = snddev_icodec_set_device_volume_impl(
+						dev_info, dev_info->dev_volume);
 		}
 
 		mutex_unlock(&drv->lb_lock);
 	} else {
 		mutex_lock(&drv->tx_lock);
-		pr_err("%s: tx_active = %d\n", __func__, drv->tx_active);
 		if (drv->tx_active) {
 			mutex_unlock(&drv->tx_lock);
 			rc = -EBUSY;
@@ -724,13 +715,12 @@ static int snddev_icodec_open(struct msm_snddev_info *dev_info)
 		rc = snddev_icodec_open_tx(icodec);
 
 		if (!IS_ERR_VALUE(rc)) {
+			drv->tx_active = 1;
 			if ((icodec->data->dev_vol_type & (
 				SNDDEV_DEV_VOL_DIGITAL |
 				SNDDEV_DEV_VOL_ANALOG)))
-				rc = snddev_icodec_set_device_volume_impl(dev_info, dev_info->dev_volume);
-					pr_err("%s: tx_active_vol = %d\n", __func__, drv->tx_active);
-				if(!IS_ERR_VALUE(rc)) 
-					drv->tx_active = 1;
+				rc = snddev_icodec_set_device_volume_impl(
+						dev_info, dev_info->dev_volume);
 		}
 		mutex_unlock(&drv->tx_lock);
 	}
@@ -752,14 +742,12 @@ static int snddev_icodec_close(struct msm_snddev_info *dev_info)
 
 	if (icodec->data->capability & SNDDEV_CAP_RX) {
 		mutex_lock(&drv->rx_lock);
-		pr_err("%s: rx_active_close = %d\n", __func__, drv->rx_active);
 		if (!drv->rx_active) {
 			mutex_unlock(&drv->rx_lock);
 			rc = -EPERM;
 			goto error;
 		}
 		rc = snddev_icodec_close_rx(icodec);
-		pr_err("%s: rc_close_rx = %d\n", __func__, rc);
 		if (!IS_ERR_VALUE(rc))
 			drv->rx_active = 0;
 		mutex_unlock(&drv->rx_lock);
@@ -769,14 +757,12 @@ static int snddev_icodec_close(struct msm_snddev_info *dev_info)
 		mutex_unlock(&drv->lb_lock);
 	} else {
 		mutex_lock(&drv->tx_lock);
-		pr_err("%s: tx_active_close = %d\n", __func__, drv->tx_active);
 		if (!drv->tx_active) {
 			mutex_unlock(&drv->tx_lock);
 			rc = -EPERM;
 			goto error;
 		}
 		rc = snddev_icodec_close_tx(icodec);
-		pr_err("%s: rc_close_tx = %d\n", __func__, rc);
 		if (!IS_ERR_VALUE(rc))
 			drv->tx_active = 0;
 		mutex_unlock(&drv->tx_lock);
@@ -816,12 +802,10 @@ static int snddev_icodec_set_freq(struct msm_snddev_info *dev_info, u32 rate)
 
 	icodec = dev_info->private_data;
 	if (adie_codec_freq_supported(icodec->data->profile, rate) != 0) {
-		pr_err("%s: adie_codec_freq failed\n", __func__);
 		rc = -EINVAL;
 		goto error;
 	} else {
 		if (snddev_icodec_check_freq(rate) != 0) {
-			pr_err("%s: check_freq failed\n", __func__);
 			rc = -EINVAL;
 			goto error;
 		} else
@@ -965,8 +949,8 @@ int snddev_icodec_set_device_volume(struct msm_snddev_info *dev_info,
 
 	mutex_lock(lock);
 
-	if ( snddev_icodec_set_device_volume_impl(dev_info, dev_info->dev_volume) < 0 ) 
-		printk(" snddev_icodec_set_device_volume_impl returns error\n"); 
+	rc = snddev_icodec_set_device_volume_impl(dev_info,
+			dev_info->dev_volume);
 	mutex_unlock(lock);
 	return rc;
 }

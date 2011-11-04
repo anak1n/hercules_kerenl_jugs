@@ -2788,7 +2788,7 @@ static int msm_fb_ioctl(struct fb_info *info, unsigned int cmd,
 		up(&msm_fb_ioctl_ppp_sem);
 		break;
 		/*This ioctl is commented. Because of this ioctl, HDMI is not working. Even Sleep current is too high. */
-#if 1
+#if 0
 	case MSMFB_MIXER_INFO:
 		down(&msm_fb_ioctl_ppp_sem);
 		ret = msmfb_mixer_info(info, argp);

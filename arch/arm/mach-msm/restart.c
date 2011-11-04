@@ -74,7 +74,7 @@ module_param_call(download_mode, dload_set, param_get_int,
 static int panic_prep_restart(struct notifier_block *this,
 			      unsigned long event, void *ptr)
 {
-	if(!sec_debug_is_enabled()) {
+	if(!sec_debug_level()) {
 		printk(KERN_NOTICE "panic_prep_restart\n");
 		return NOTIFY_DONE;
 	}
@@ -171,7 +171,7 @@ void arch_reset(char mode, const char *cmd)
 #ifdef CONFIG_MSM_DLOAD_MODE
 
 #ifdef CONFIG_SEC_DEBUG // klaatu
-	if( sec_debug_is_enabled() && ((restart_mode == RESTART_DLOAD) || in_panic) )
+	if( (restart_mode == RESTART_DLOAD) || in_panic )
 		set_dload_mode(1);
 	else
 		set_dload_mode(0);
@@ -298,10 +298,7 @@ static int __init msm_restart_init(void)
 	register_reboot_notifier(&dload_reboot_block);
 #endif
 	/* Reset detection is switched on below.*/
-	if( sec_debug_is_enabled() )
-		set_dload_mode(1);
-	else
-		set_dload_mode(0);
+	set_dload_mode(1);
 #endif
 
 	pm_power_off = msm_power_off;

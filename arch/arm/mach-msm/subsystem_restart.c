@@ -503,8 +503,8 @@ static int __init subsys_restart_init(void)
 {
 	int ret = 0;
 
-#if defined(CONFIG_SEC_DEBUG) && !defined(CONFIG_USA_MODEL_SGH_T989) && !defined(CONFIG_USA_MODEL_SGH_I727)
-	if(!sec_debug_is_enabled()) // if debug_level is low, silrent reset is activated.
+#if defined(CONFIG_SEC_DEBUG) && !defined(CONFIG_USA_MODEL_SGH_T989)
+	if(!sec_debug_level()) // if debug_level is low, silrent reset is activated.
 		restart_level = RESET_SUBSYS_COUPLED;
 	else
 #endif

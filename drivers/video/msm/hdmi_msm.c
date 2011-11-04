@@ -109,7 +109,6 @@ static DEFINE_MUTEX(hdmi_msm_power_on_mutex);
 static DEFINE_MUTEX(hdcp_auth_state_mutex);
 
 static DECLARE_WAIT_QUEUE_HEAD(hdmi_msm_resolution_switchEvent);
-static DECLARE_WAIT_QUEUE_HEAD(hdmi_msm_state_work_completedEvent);
 static void hdmi_msm_hdcp_enable(void);
 static boolean hdmi_msm_is_dvi_mode(void);
 
@@ -292,16 +291,14 @@ static bool mhl_disconnected = false;
 
 bool mhl_hpd_state=false;
 static bool resolution_switch_signal = false;
-static bool state_work_completed = true;
+
 
 void mhl_hpd_handler(bool state)//Rajucm
 {
 
 	DEV_INFO("mhl_hpd_handler with state as %d\n", state);
-	wait_event_interruptible_timeout(hdmi_msm_state_work_completedEvent, state_work_completed, msecs_to_jiffies(4000));
-	state_work_completed = false;
+    mhl_hpd_state = state;
 	hdmi_msm_state->hpd_cable_chg_detected = TRUE;
-	mhl_hpd_state = state;
 	if(state)
 		{
 			msleep(200);	//To make sure that the previous  disconnect event handling  is completed.
@@ -3599,11 +3596,15 @@ static int hdmi_msm_power_on(struct platform_device *pdev)
 {
 	struct msm_fb_data_type *mfd = platform_get_drvdata(pdev);
 	bool changed;
-	int rc;
 	struct fb_var_screeninfo *var = &mfd->fbi->var;
 
 	if (!hdmi_msm_state || !hdmi_msm_state->hdmi_app_clk || !HDMI_BASE)
 		return -ENODEV;
+	//Added to fix boot up HDMI issue
+#ifdef CONFIG_VIDEO_MHL_V1
+	if(!hdmi_msm_state->hpd_initialized && !mhl_connected)  //hpd from mhl not from the hpd feature.
+		return -ENODEV;
+#endif
 
 #ifdef CONFIG_SUSPEND
 	mutex_lock(&hdmi_msm_state_mutex);
@@ -3615,17 +3616,6 @@ static int hdmi_msm_power_on(struct platform_device *pdev)
 	mutex_unlock(&hdmi_msm_state_mutex);
 #endif
 
-//Added to fix boot up HDMI issue
-#ifdef CONFIG_VIDEO_MHL_V1
-	if(!hdmi_msm_state->hpd_initialized && !mhl_connected){  //hpd from mhl not from the hpd feature.
-		rc = hdmi_msm_hpd_on(false);
-		DEV_INFO("HPD: panel power on without mhl connected, hence should be powered off by caller\n");
-		if (rc) {
-			DEV_WARN("HPD: activation failed: rc=%d\n", rc);			
-			return rc;
-		}
-	}
-#endif
 	
 	DEV_INFO("power: ON (%dx%d %d)\n", mfd->var_xres, mfd->var_yres,
 		mfd->var_pixclock);
@@ -3675,8 +3665,8 @@ static int hdmi_msm_power_on(struct platform_device *pdev)
 		hdmi_msm_is_power_on() ? "ON" : "OFF" ,
 		hdmi_msm_is_dvi_mode() ? "ON" : "OFF");
 
-	state_work_completed = true;
-	wake_up_interruptible(&hdmi_msm_state_work_completedEvent);
+	
+
 	
 	return 0;
 }
@@ -3689,9 +3679,10 @@ static int hdmi_msm_power_on(struct platform_device *pdev)
  */
 static int hdmi_msm_power_off(struct platform_device *pdev)
 {
+	
+
 	if (!hdmi_msm_state->hdmi_app_clk)
 		return -ENODEV;
-	
 #ifdef CONFIG_SUSPEND
 	mutex_lock(&hdmi_msm_state_mutex);
 	if (hdmi_msm_state->pm_suspended) {
@@ -3702,16 +3693,25 @@ static int hdmi_msm_power_off(struct platform_device *pdev)
 	mutex_unlock(&hdmi_msm_state_mutex);
 #endif
 
+#ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL_HDCP_SUPPORT
+	mutex_lock(&hdmi_msm_state_mutex);
+	if (hdmi_msm_state->hdcp_activating || mhl_hpd_state) {
+		hdmi_msm_state->panel_power_on = FALSE;
+		mutex_unlock(&hdmi_msm_state_mutex);
+		DEV_INFO("HDCP: activating, returning\n");
+		return 0;
+	}
+	mutex_unlock(&hdmi_msm_state_mutex);
+#else
 	mutex_lock(&hdmi_msm_state_mutex);
 	if(mhl_hpd_state) // to handle poweroff after dtv_on in case of first boot
 		{
 			hdmi_msm_state->panel_power_on = FALSE;
 			mutex_unlock(&hdmi_msm_state_mutex);
-			DEV_WARN("%s : mhl_hpd_state is still Active, returning\n",__func__);
 			return 0;
 		}
 	mutex_unlock(&hdmi_msm_state_mutex);
-
+#endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL_HDCP_SUPPORT */
 
 	DEV_INFO("power: OFF (audio off, Reset Core)\n");
 	hdmi_msm_audio_off();
@@ -3732,8 +3732,6 @@ static int hdmi_msm_power_off(struct platform_device *pdev)
 #endif
 
 	hdmi_msm_state->panel_power_on = FALSE;
-	state_work_completed = true;
-	wake_up_interruptible(&hdmi_msm_state_work_completedEvent);
 	return 0;
 }
 

@@ -33,9 +33,6 @@
 #include <asm/atomic.h>
 #include <asm/ioctls.h>
 #include "rtac.h"
-#if defined (CONFIG_USA_MODEL_SGH_I727)
-#include <linux/mfd/pmic8901.h>
-#endif
 
 #define TRUE        0x01
 #define FALSE       0x00
@@ -269,9 +266,6 @@ struct audio_client *q6asm_audio_client_alloc(app_cb cb, void *priv)
 
 	if (ac->apr == NULL) {
 		pr_err("%s Registration with APR failed\n", __func__);
-#if defined (CONFIG_USA_MODEL_SGH_I727)
-		pr_info("%s: PMIC 8901 S3 voltage=%d\n", __func__, pm8901_smps3_get_voltage());
-#endif
 			goto fail;
 	}
 #ifdef CONFIG_MSM8X60_RTAC

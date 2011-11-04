@@ -1529,7 +1529,6 @@ static	void	Int4Isr( void )
 			{          
 				vbus_mhl_est_fail = TRUE;
 				MhlTxDrvProcessDisconnection();
-				FSA9480_MhlSwitchSel(0); 
 				return;
 			}
 			else

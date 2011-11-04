@@ -1177,14 +1177,12 @@ static irqreturn_t msm_otg_irq(int irq, void *data)
 */
 #if defined (CONFIG_USA_MODEL_SGH_I727) || defined (CONFIG_USA_MODEL_SGH_T989)
 #else
-	if(printk_ratelimit()){
+	pr_info("function   %s\n", __func__);
 
-		pr_debug("function   %s\n", __func__);
-
-		pr_debug("IRQ state: %s\n", state_string(state));
-		pr_debug("otgsc = %x\n", otgsc);
-	}
+	pr_info("IRQ state: %s\n", state_string(state));
+	pr_info("otgsc = %x\n", otgsc);
 #endif
+
 	if ((otgsc & OTGSC_IDIE) && (otgsc & OTGSC_IDIS)) {
 		if (otgsc & OTGSC_ID) {
 			pr_info("Id set\n");
@@ -1225,15 +1223,15 @@ static irqreturn_t msm_otg_irq(int irq, void *data)
 		work = 1;
 	} else if (sts & STS_PCI) {
 		pc = __raw_readl(USB_PORTSC);
-		/*
-		cause:	While USB tethered, connect and disconnect - Reset ramdump happens
-		Fix: 	Avoid excessive logging
-		QCT SR:	612724  
-		*/
-		if(printk_ratelimit())
-		    pr_debug("portsc = %x\n", pc); //LIMIT PRINTk
-
-		ret = IRQ_NONE;
+		pr_info("portsc = %x\n", pc);
+// clear pending IRQs
+		if(test_bit(B_SESS_VLD,&dev->inputs))
+			ret = IRQ_NONE;
+		else
+		{
+			__raw_writel(__raw_readl(USB_USBSTS), USB_USBSTS); //clear pending IRQs
+			ret = IRQ_HANDLED;
+		}
 		/* HCD Acks PCI interrupt. We use this to switch
 		 * between different OTG states.
 		 */

@@ -625,10 +625,6 @@ qup_i2c_recover_bus_busy(struct qup_i2c_dev *dev)
 	return -EBUSY;
 }
 
-/* Power analog function of codec */
-static struct regulator *vreg_s4_timpani;
-static struct regulator *vreg_s3_timpani;
-static struct regulator *vreg_l0_timpani;
 
 static int
 qup_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
@@ -873,30 +869,7 @@ handle_irq:
 					dev_err(dev->dev,
 					"I2C slave addr:0x%x not connected\n",
 					dev->msg->addr);
-					dev->err = ENOTCONN;					
-
-					// Logs for checking the voltage values of 8058_S4, 8058_S3 and 8058_L0 during I2C NACK issues
-					vreg_s4_timpani = regulator_get(NULL, "8058_s4");
-					if(vreg_s4_timpani != NULL)
-						printk("%s:: Regulator 8058_S4 Voltage : %d is Enabled :%d\n",__func__,regulator_get_voltage(vreg_s4_timpani),
-						regulator_is_enabled(vreg_s4_timpani));
-					else
-						pr_err("%s:: Regulator 8058_S4 is NULL!!!!!!",__func__);
-
-					vreg_s3_timpani = regulator_get(NULL, "8058_s3");
-					if(vreg_s3_timpani != NULL)
-						printk("%s:: Regulator 8058_S3 Voltage : %d is Enabled :%d\n",__func__,regulator_get_voltage(vreg_s3_timpani),
-						regulator_is_enabled(vreg_s3_timpani));
-					else
-						pr_err("%s:: Regulator 8058_S3 is NULL!!!!!!",__func__);
-
-					vreg_l0_timpani = regulator_get(NULL, "8058_l0");
-					if(vreg_l0_timpani != NULL)
-						printk("%s:: Regulator 8058_L0 Voltage : %d is Enabled :%d\n",__func__,regulator_get_voltage(vreg_l0_timpani),
-						regulator_is_enabled(vreg_l0_timpani));
-					else
-						pr_err("%s:: Regulator 8058_L0 is NULL!!!!!!",__func__);
-								
+					dev->err = ENOTCONN;
 				} else if (dev->err < 0) {
 					dev_err(dev->dev,
 					"QUP data xfer error %d\n", dev->err);

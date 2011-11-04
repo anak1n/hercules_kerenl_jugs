@@ -100,8 +100,16 @@ static inline void __list_del(struct list_head * prev, struct list_head * next)
  * in an undefined state.
  */
 #ifndef CONFIG_DEBUG_LIST
+#if defined(CONFIG_SEC_DEBUG)
+extern void sec_debug_list(void *entry);
+#endif
+
 static inline void list_del(struct list_head *entry)
 {
+#if defined(CONFIG_SEC_DEBUG)
+	sec_debug_list(entry);
+#endif
+
 	__list_del(entry->prev, entry->next);
 	entry->next = LIST_POISON1;
 	entry->prev = LIST_POISON2;

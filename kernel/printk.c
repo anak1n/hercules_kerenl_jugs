@@ -265,7 +265,7 @@ void printk_remap_nocache(void)
 	unsigned start;
 
 #if 1
-	if( 0 == sec_debug_is_enabled() ) {
+	if( 0 == sec_debug_level() ) {
 		sec_getlog_supply_kloginfo(log_buf);
 		return;
 	}

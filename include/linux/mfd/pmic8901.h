@@ -80,8 +80,4 @@ int pm8901_irq_get_rt_status(struct pm8901_chip *pm_chip, int irq);
 
 int pm8901_reset_pwr_off(int reset);
 
-#if defined (CONFIG_USA_MODEL_SGH_I727)
-int pm8901_smps3_get_voltage(void);
-#endif
-
 #endif /* __PMIC8901_H__ */

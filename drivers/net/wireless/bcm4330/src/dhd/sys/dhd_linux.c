@@ -413,14 +413,7 @@ uint dhd_pkt_filter_init = 0;
 module_param(dhd_pkt_filter_init, uint, 0);
 
 /* Pkt filter mode control */
-
-#ifndef WHITELIST_PKT_FILTER
 uint dhd_master_mode = FALSE;
-#else
-char pkt_filter_cmd1[64];
-char pkt_filter_cmd2[64];
-uint dhd_master_mode = TRUE;
-#endif
 module_param(dhd_master_mode, uint, 1);
 
 #ifdef DHDTHREAD
@@ -2630,10 +2623,6 @@ dhd_bus_start(dhd_pub_t *dhdp)
 	char iovbuf[WL_EVENTING_MASK_LEN + 12];	/*  Room for "event_msgs" + '\0' + bitvec  */
 #endif /* EMBEDDED_PLATFORM */
 
-#ifdef WHITELIST_PKT_FILTER
-	uint8 pf_offset=0;
-#endif
-
 	ASSERT(dhd);
 
 	DHD_TRACE(("%s: \n", __FUNCTION__));
@@ -2718,11 +2707,9 @@ dhd_bus_start(dhd_pub_t *dhdp)
 	setbit(dhdp->eventmask, WLC_E_ROAM);
 #endif /* EMBEDDED_PLATFORM */
 
-#ifndef WHITELIST_PKT_FILTER
 	dhdp->pktfilter_count = 1;
 	/* Setup filter to deny broadcast packets */
 	dhdp->pktfilter[0] = "100 0 0 0 0xffffff 0xffffff";
-#endif
 
 #ifdef USE_CID_CHECK
     check_module_cid(dhdp);
@@ -2742,29 +2729,6 @@ dhd_bus_start(dhd_pub_t *dhdp)
 	WriteRDWR_Macaddr(&dhd->pub.mac);
 #elif defined(WRITE_MACADDR)
 	Write_Macaddr(&dhd->pub.mac);
-#endif
-
-#ifdef WHITELIST_PKT_FILTER
-	bzero(pkt_filter_cmd1, 64);
-	bzero(pkt_filter_cmd2, 64);
-
-	strcpy(pkt_filter_cmd1, "100 0 0 0 0xffffffffffff ");
-	pf_offset=strlen(pkt_filter_cmd1);
-	sprintf(&pkt_filter_cmd1[pf_offset], "0x%02x%02x%02x%02x%02x%02x"
-		, dhdp->mac.octet[0], dhdp->mac.octet[1], dhdp->mac.octet[2], dhdp->mac.octet[3], dhdp->mac.octet[4], dhdp->mac.octet[5]);
-
-	strcpy(pkt_filter_cmd2, "101 0 0 0 0xffffffffffff ");
-	pf_offset=strlen(pkt_filter_cmd2);
-	sprintf(&pkt_filter_cmd2[pf_offset], "0x%02x%02x%02x%02x%02x%02x"
-		, dhdp->mac.octet[0]|0x02, dhdp->mac.octet[1], dhdp->mac.octet[2], dhdp->mac.octet[3], dhdp->mac.octet[4]^0x80, dhdp->mac.octet[5]);
-
-	dhdp->pktfilter_count = 5;
-	/* Setup filter to pass the following packets */
-	dhdp->pktfilter[0] = pkt_filter_cmd1;				//eth0 unicast packets
-	dhdp->pktfilter[1] = pkt_filter_cmd2;				//p2p0.1 unicast packets
-	dhdp->pktfilter[2] = "104 0 0 12 0xffff 0x0806";	//arp packets
-	dhdp->pktfilter[3] = "106 0 0 0 0xffffff 0x01005e";	//ipv4 multicast packets
-	dhdp->pktfilter[4] = "108 0 0 0 0xffff 0x3333";		//ipv6 multicast packets
 #endif
 
 	return 0;

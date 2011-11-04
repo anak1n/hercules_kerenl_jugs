@@ -451,8 +451,6 @@ module_param(debug_data_on, int, 0);
 /** The driver context */
 static struct sdio_al *sdio_al;
 
-static uint32_t comm_error;
-
 /* Static functions declaration */
 static int enable_eot_interrupt(struct sdio_al_device *sdio_al_dev,
 				int pipe_index, int enable);
@@ -3066,17 +3064,9 @@ int sdio_write(struct sdio_channel *ch, const void *data, int len)
 	if (ch->signature != SDIO_AL_SIGNATURE) {
 		pr_err(MODULE_NAME ":%s: Invalid signature 0x%x\n",  __func__,
 			ch->signature);
-		sdio_al_dev = ch->sdio_al_dev;
-		if((sdio_al_dev != NULL) && (sdio_al_dev->state == MODEM_RESTART))
-		{	
-			comm_error ++ ;
-			if(comm_error > 40)
-				panic(" sdio_al silentreset ");
-		}
 		return -ENODEV;
 	}
-	comm_error = 0;
-	
+
 	sdio_al_dev = ch->sdio_al_dev;
 	if (sdio_al_verify_dev(sdio_al_dev, __func__))
 		return -ENODEV;
@@ -3159,7 +3149,7 @@ static int __devinit msm_sdio_al_probe(struct platform_device *pdev)
 		pr_err(MODULE_NAME ": %s: NULL sdio_al\n", __func__);
 		return -ENODEV;
 	}
-	
+
 	sdio_al->pdata = pdev->dev.platform_data;
 	return 0;
 }
@@ -3244,8 +3234,7 @@ static void msm_sdio_al_shutdown(struct platform_device *pdev)
 						    " for card %d",
 					__func__,
 					sdio_al_dev->card->host->index);
-				if (sdio_al_dev->state == CARD_INSERTED)
-					sdio_release_irq(func1);
+				sdio_release_irq(func1);
 			}
 		}
 
@@ -3257,8 +3246,7 @@ static void msm_sdio_al_shutdown(struct platform_device *pdev)
 				continue;
 			platform_device_unregister(
 				sdio_al_dev->channel[j].pdev);
-			sdio_al_dev->channel[j].signature = 0x0;
-			sdio_al_dev->channel[j].state = SDIO_CHANNEL_STATE_INVALID;
+			sdio_al_dev->channel[i].signature = 0x0;
 		}
 
 		if (!sdio_al_verify_func1(sdio_al_dev, __func__))

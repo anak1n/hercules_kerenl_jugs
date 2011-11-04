@@ -1750,9 +1750,7 @@ static struct msm_hsusb_gadget_platform_data msm_gadget_pdata = {
 
 static char *usb_functions_rndis[] = {
 	"rndis",
-#ifndef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
 	"diag",
-#endif
 };
 
 #ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
@@ -6316,7 +6314,7 @@ static int sec_jack_read_adc(int channel, int *adc_data)
 		goto out;
 	}
 //	wait_for_completion(&conv_complete_evt);
-	ret = wait_for_completion_timeout(&conv_complete_evt, 10*HZ);
+	ret = wait_for_completion_timeout(&conv_complete_evt, 5*HZ);
 	if (!ret) {
 		pr_err("%s: wait interrupted channel %d ret=%d\n",
 						__func__, channel, ret);
@@ -6990,7 +6988,7 @@ static struct snd_set_ampgain init_ampgain[] = {
 		.hp_att = 0,
 		.hp_gainup = 0,
 		.sp_att = 31,
-		.sp_gainup = 0,
+		.sp_gainup = 2,
 	},
     // HEADSET
 	[1] = {
@@ -7008,7 +7006,7 @@ static struct snd_set_ampgain init_ampgain[] = {
 		.hp_att = 1,
 		.hp_gainup = 1,
 		.sp_att = 31,
-		.sp_gainup = 0,
+		.sp_gainup = 2,
 	},
 	// SPK_CALL
 	[3] = {
@@ -7016,8 +7014,8 @@ static struct snd_set_ampgain init_ampgain[] = {
 	.in2_gain = 2,
 	.hp_att = 0,
 	.hp_gainup = 0,
-	.sp_att = 30,
-	.sp_gainup = 1,
+	.sp_att = 31,
+	.sp_gainup = 2,
 	},
 	// HEADSET_CALL
 	[4] = {

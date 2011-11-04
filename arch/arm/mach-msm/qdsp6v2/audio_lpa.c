@@ -842,8 +842,7 @@ static long audio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			goto fail;
 		} else {
 			struct asm_softpause_params softpause = {
-				//.enable = SOFT_PAUSE_ENABLE,
-				.enable = SOFT_PAUSE_DISABLE,	// disable this feature (not supported yet)
+				.enable = SOFT_PAUSE_ENABLE,
 				.period = SOFT_PAUSE_PERIOD,
 				.step = SOFT_PAUSE_STEP,
 				.rampingcurve = SOFT_PAUSE_CURVE_LINEAR,

@@ -90,10 +90,10 @@ static const int adc_table[4] = {
 };
 #elif defined(CONFIG_USA_MODEL_SGH_I727)
 static const int adc_table[4] = {
-	360,
-	798,
-	1240,
-	1673,
+	300,
+	735,
+	1180,
+	1615,
 };
 #else
 static const int adc_table[4] = {

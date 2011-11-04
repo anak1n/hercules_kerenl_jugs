@@ -29,10 +29,6 @@
 #include <mach/msm_iomap.h>
 #include <mach/msm_xo.h>
 
-#if defined (CONFIG_USA_MODEL_SGH_I727)
-#include <linux/mfd/pmic8901.h> 
-#endif
-
 #include "peripheral-loader.h"
 #include "clock-8x60.h"
 
@@ -78,10 +74,6 @@
 #define PAS_MEM_CMD		2
 #define PAS_AUTH_AND_RESET_CMD	5
 #define PAS_SHUTDOWN_CMD	6
-
-#if defined (CONFIG_USA_MODEL_SGH_I727)
-#define REG_LPA(off)	(MSM_LPASS_CLK_CTL_BASE + (off))
-#endif
 
 struct pas_init_image_req {
 	u32	proc;
@@ -416,83 +408,10 @@ static void remove_q6_proxy_votes_now(void)
 		remove_q6_proxy_votes(0);
 }
 
-#if defined (CONFIG_USA_MODEL_SGH_I727)
-int qdsp_clock_register_read(void) 
-{ 
- int lcc_offset,lcc_phy_address,cnt; 
- int value = 0; 
- 
- for (cnt = 0; cnt < 12; cnt++) { 
- lcc_offset = cnt*0x4; 
- if (cnt == 11) 
- lcc_offset = 0xB4; 
- lcc_phy_address = MSM_LPASS_CLK_CTL_PHYS + lcc_offset; 
- value = readl(REG_LPA(lcc_offset)); 
- pr_info("%s: DSP_CLK_register(0x%x): rc=%x\n", 
- __func__, lcc_phy_address, value); 
- } 
-} 
-#endif
-
 static int reset_q6_untrusted(void)
 {
-#if defined (CONFIG_USA_MODEL_SGH_I727)
 	u32 reg;
-    int ret; 
 
-    ret = local_src_enable(PLL_4); 
-    if (ret) 
-        return ret; 
-
-	printk(KERN_INFO "%s: enter\n", __func__);
-	make_q6_proxy_votes();
-
-     /*get the S3B voltage*/ 
-         pr_info("%s: PMIC 8901 S3 voltage=%d\n", __func__, pm8901_smps3_get_voltage()); 
-	/* Put Q6 into reset */
-	reg = readl(LCC_Q6_FUNC);
-	reg |= Q6SS_SS_ARES | Q6SS_ISDB_ARES | Q6SS_ETM_ARES | STOP_CORE |
-		CORE_ARES;
-	reg &= ~CORE_GFM4_CLK_EN;
-	writel(reg, LCC_Q6_FUNC);
-
-	/* Wait 8 AHB cycles for Q6 to be fully reset (AHB = 1.5Mhz) */
-	usleep_range(20, 30);
-
-	/* Turn on Q6 memory */
-	reg |= CORE_GFM4_CLK_EN | CORE_L1_MEM_CORE_EN | CORE_TCM_MEM_CORE_EN |
-		CORE_TCM_MEM_PERPH_EN;
-	writel(reg, LCC_Q6_FUNC);
-
-	/* Turn on Q6 core clocks and take core out of reset */
-	reg &= ~(CLAMP_IO | Q6SS_SS_ARES | Q6SS_ISDB_ARES | Q6SS_ETM_ARES |
-			CORE_ARES);
-	writel(reg, LCC_Q6_FUNC);
-
-	/* Wait for clocks to be enabled */
-	mb();
-	/* Program boot address */
-	writel((q6_start >> 12) & 0xFFFFF, QDSP6SS_RST_EVB);
-
-	writel(Q6_STRAP_TCM_CONFIG | Q6_STRAP_TCM_BASE, QDSP6SS_STRAP_TCM);
-	writel(Q6_STRAP_AHB_UPPER | Q6_STRAP_AHB_LOWER, QDSP6SS_STRAP_AHB);
-
-	/* Wait for addresses to be programmed before starting Q6 */
-	mb();
-
-	/* Start Q6 instruction execution */
-	reg &= ~STOP_CORE;
-	writel(reg, LCC_Q6_FUNC);
-
-     pr_info("%s: PMIC 8901 S3 voltage=%d\n", __func__, pm8901_smps3_get_voltage()); 
-     qdsp_clock_register_read(); 
-
-	printk(KERN_INFO "%s: exit\n", __func__);
-	return 0;
-	
-#else
-		u32 reg;
-	printk(KERN_INFO "%s: enter\n", __func__);
 	make_q6_proxy_votes();
 
 	/* Put Q6 into reset */
@@ -530,34 +449,14 @@ static int reset_q6_untrusted(void)
 	reg &= ~STOP_CORE;
 	writel(reg, LCC_Q6_FUNC);
 
-	printk(KERN_INFO "%s: exit\n", __func__);
 	return 0;
-#endif
 }
 
 static int reset_q6_trusted(void)
 {
-#if defined (CONFIG_USA_MODEL_SGH_I727)
-     int rc;
-
-    printk(KERN_INFO "%s: enter\n", __func__);
 	make_q6_proxy_votes();
 
-   // return auth_and_reset_trusted(PAS_Q6);
-    pr_info("%s: PMIC 8901 S3 voltage=%d\n", __func__, pm8901_smps3_get_voltage()); 
-    rc = auth_and_reset_trusted(PAS_Q6); 
-    pr_info("%s: PMIC 8901 S3 voltage=%d\n", __func__, pm8901_smps3_get_voltage()); 
-
-    qdsp_clock_register_read(); 
-	printk(KERN_INFO "%s: exit\n", __func__);
-    return rc; 
-#else
-	printk(KERN_INFO "%s: enter\n", __func__);
-	make_q6_proxy_votes();
-
-	printk(KERN_INFO "%s: exit\n", __func__);
 	return auth_and_reset_trusted(PAS_Q6);
-#endif
 }
 
 static int shutdown_q6_untrusted(void)

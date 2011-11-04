@@ -56,8 +56,8 @@ static int32_t afe_callback(struct apr_client_data *data, void *priv)
 	if (data->payload_size) {
 		uint32_t *payload;
 		payload = data->payload;
-		pr_info("%s: opcode = 0x%x cmd = 0x%x status = 0x%x\n", __func__,
-					data->opcode,payload[0], payload[1]);
+		pr_debug("%s: cmd = 0x%x status = 0x%x\n", __func__,
+					payload[0], payload[1]);
 		if (data->opcode == APR_BASIC_RSP_RESULT) {
 			switch (payload[0]) {
 			case AFE_PORT_AUDIO_IF_CONFIG:
@@ -85,7 +85,7 @@ static int32_t afe_callback(struct apr_client_data *data, void *priv)
 int afe_validate_port(u16 port_id)
 {
 	int ret;
-	pr_info("%s: port_id : %x",__func__,port_id);
+
 	switch (port_id) {
 	case PRIMARY_I2S_RX:
 	case PRIMARY_I2S_TX:
@@ -348,7 +348,7 @@ fail_cmd:
 	return ret;
 }
 
-//Qualcomm CR Add
+//Qualcomm CR Add 
 int afe_apply_gain(u16 port_id, u16 gain)
 {
 	struct afe_port_gain_command set_gain;

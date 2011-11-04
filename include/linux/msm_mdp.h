@@ -277,9 +277,9 @@ struct mdp_mixer_info {
 struct msmfb_mixer_info_req {
 	int mixer_num;
 	int cnt;
-	struct mdp_mixer_info info[MAX_PIPE_PER_MIXER];
+	//struct mdp_mixer_info info[MAX_PIPE_PER_MIXER];
 	//Reverting back to 8, because HDMI detection issue.
-	//struct mdp_mixer_info info[8]; 
+	struct mdp_mixer_info info[8]; 
 };
 
 

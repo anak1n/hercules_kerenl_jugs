@@ -30,8 +30,6 @@
 #include <linux/skbuff.h>
 #include <linux/wakelock.h>
 #include <linux/debugfs.h>
-#include <linux/smp.h>
-#include <linux/cpumask.h>
 
 #include <mach/sdio_al.h>
 #include <mach/sdio_dmux.h>
@@ -243,7 +241,6 @@ static void *handle_sdio_mux_command(struct sdio_mux_hdr *hdr,
 	case SDIO_MUX_HDR_CMD_OPEN:
 		spin_lock_irqsave(&sdio_ch[hdr->ch_id].lock, flags);
 		sdio_ch[hdr->ch_id].status |= SDIO_CH_REMOTE_OPEN;
-		sdio_ch[hdr->ch_id].num_tx_pkts = 0;
 
 		if (sdio_ch_is_in_reset(hdr->ch_id)) {
 			DBG("%s: in reset - sending open cmd\n", __func__);
@@ -311,19 +308,6 @@ static void sdio_mux_read_data(struct work_struct *work)
 	void *ptr = 0;
 	int sz, rc, len = 0;
 	struct sdio_mux_hdr *hdr;
-	static int workqueue_pinned;
-
-	if (!workqueue_pinned) {
-		struct cpumask cpus;
-
-		cpumask_clear(&cpus);
-		cpumask_set_cpu(0, &cpus);
-
-		if (sched_setaffinity(current->pid, &cpus))
-			pr_err("%s: sdio_dmux set CPU affinity failed\n",
-			__func__);
-		workqueue_pinned = 1;	
-	}
 
 	DBG("%s: reading\n", __func__);
 	/* should probably have a separate read lock */
@@ -374,7 +358,7 @@ static void sdio_mux_read_data(struct work_struct *work)
 		pr_err("%s: sdio read failed %d\n", __func__, rc);
 		dev_kfree_skb_any(skb_mux);
 		mutex_unlock(&sdio_mux_lock);
-		queue_work_on(0, sdio_mux_workqueue, &work_sdio_mux_read);
+		queue_work(sdio_mux_workqueue, &work_sdio_mux_read);
 		return;
 	}
 	mutex_unlock(&sdio_mux_lock);
@@ -405,7 +389,7 @@ static void sdio_mux_read_data(struct work_struct *work)
 	dev_kfree_skb_any(skb_mux);
 
 	DBG("%s: read done\n", __func__);
-	queue_work_on(0, sdio_mux_workqueue, &work_sdio_mux_read);
+	queue_work(sdio_mux_workqueue, &work_sdio_mux_read);
 }
 
 static int sdio_mux_write(struct sk_buff *skb)
@@ -511,13 +495,9 @@ static void sdio_mux_write_data(struct work_struct *work)
 			 * prevent future writes and clean up pending ones
 			 */
 			fatal_error = 1;
-			do {
-				ch_id = ((struct sdio_mux_hdr *) skb->data)->ch_id;
-				spin_lock(&sdio_ch[ch_id].lock);
-				sdio_ch[ch_id].num_tx_pkts--;
-				spin_unlock(&sdio_ch[ch_id].lock);
 			dev_kfree_skb_any(skb);
-			} while ((skb = __skb_dequeue(&sdio_mux_write_pool)));
+			while ((skb = __skb_dequeue(&sdio_mux_write_pool)))
+				dev_kfree_skb_any(skb);
 			spin_unlock_irqrestore(&sdio_mux_write_lock, flags);
 			return;
 		} else {
@@ -538,7 +518,7 @@ static void sdio_mux_write_data(struct work_struct *work)
 			notify = 1;
 		} else {
 			__skb_queue_head(&sdio_mux_write_pool, skb);
-			queue_delayed_work_on(0, sdio_mux_workqueue,
+			queue_delayed_work(sdio_mux_workqueue,
 					&delayed_work_sdio_mux_write,
 					msecs_to_jiffies(250)
 					);
@@ -649,7 +629,7 @@ int msm_sdio_dmux_write(uint32_t id, struct sk_buff *skb)
 	sdio_ch[id].num_tx_pkts++;
 	spin_unlock(&sdio_ch[id].lock);
 
-	queue_work_on(0, sdio_mux_workqueue, &work_sdio_mux_write);
+	queue_work(sdio_mux_workqueue, &work_sdio_mux_write);
 
 write_done:
 	spin_unlock_irqrestore(&sdio_mux_write_lock, flags);
@@ -728,11 +708,11 @@ static void sdio_mux_notify(void *_dev, unsigned event)
 	/* write avail may not be enouogh for a packet, but should be fine */
 	if ((event == SDIO_EVENT_DATA_WRITE_AVAIL) &&
 	    sdio_write_avail(sdio_mux_ch))
-		queue_work_on(0, sdio_mux_workqueue, &work_sdio_mux_write);
+		queue_work(sdio_mux_workqueue, &work_sdio_mux_write);
 
 	if ((event == SDIO_EVENT_DATA_READ_AVAIL) &&
 	    sdio_read_avail(sdio_mux_ch))
-		queue_work_on(0, sdio_mux_workqueue, &work_sdio_mux_read);
+		queue_work(sdio_mux_workqueue, &work_sdio_mux_read);
 }
 
 int msm_sdio_dmux_is_ch_full(uint32_t id)
@@ -857,7 +837,6 @@ static int sdio_dmux_probe(struct platform_device *pdev)
 		return rc;
 	}
 
-	fatal_error = 0;
 	sdio_mux_initialized = 1;
 	return 0;
 }

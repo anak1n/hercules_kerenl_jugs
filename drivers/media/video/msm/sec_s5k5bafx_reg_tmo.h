@@ -10,7 +10,7 @@
 /* Date		: 2011.09.19                                    */
 /* History	: 저조도 선명도 개선                            */
 /*                Brightness 단계별 셋팅값 수정                 */
-/*                Recording Block에 Delay 추가                 */
+/*                Recording Block에 Delay 추가                  */
 /************************************************************/
 
 
@@ -2543,6 +2543,7 @@ static const u32 s5k5bafx_common[] = {
 	0x0F120001,
 
 	0xffff0064, /* 100ms */
+
 	0x0028D000,
 	0x002AB0CC,
 	0x0F12000B,
@@ -5105,8 +5106,9 @@ static const u32 s5k5bafx_vt_common[] =
 	/* Update Changed Registers */
 	0x002A03FC,
 	0x0F120001, /* REG_TC_DBG_ReInitCmd */
-
+	
 	0xffff0064, /* 100ms */
+
 	0x0028D000,
 	0x002AB0CC,
 	0x0F12000B, /* Non contious mode */
@@ -7666,8 +7668,9 @@ static const u32 s5k5bafx_vt_wifi_common[] =
 	/* Update Changed Registers */
 	0x002A03FC,
 	0x0F120001, /* REG_TC_DBG_ReInitCmd */
-
+	
 	0xffff0064, /* 100ms */
+	
 	0x0028D000,
 	0x002AB0CC,
 	0x0F12000B, /* Non contious mode */
@@ -10285,8 +10288,9 @@ static const u32 s5k5bafx_recording_60Hz_common[] = {
 	/* Update Changed Registers */
 	0x002A03FC,
 	0x0F120001, /* REG_TC_DBG_ReInitCmd */
-
+	
 	0xffff0064, /* Delay 100ms */
+	
 	0x0028D000,
 	0x002AB0CC,
 	0x0F12000B, /* Non contious mode */

@@ -1081,7 +1081,7 @@ static int fsa9480_Check_AVDock(struct fsa9480_usbsw *usbsw, int device_type)
 		if (HWversion==VERSION_FSA9485)
 			mhl_vbus = true;
 		dev_info(&client->dev, "%s enter Av charing \n",__func__);
-		return IRQ_HANDLED;
+		return IRQ_NONE;
 	}
 		
 	// for check Av charging during boot up
@@ -1130,12 +1130,8 @@ static irqreturn_t fsa9480_irq_thread(int irq, void *data)
 	}
 
 #ifdef CONFIG_VIDEO_MHL_V1
-	if(HWversion==VERSION_FSA9480)
-		gv_intr2 = intr >> 8;
-	else if(HWversion==VERSION_FSA9485)
-		gv_intr2 = intr;
-#endif
-
+	gv_intr2 = intr >> 8;
+#endif	
 
 	if (HWversion==VERSION_FSA9485)
 		if (IRQ_NONE==fsa9480_Check_AVDock(usbsw,device_type)) return 0;

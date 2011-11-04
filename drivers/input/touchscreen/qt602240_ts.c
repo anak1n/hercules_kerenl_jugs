@@ -29,7 +29,6 @@
 #ifdef CONFIG_TOUCHSCREEN_MXT768E
 #include "mxt768e.h"
 #endif
-#include <mach/sec_debug.h>
 
 #include <../mach-msm/smd_private.h>
 #include <../mach-msm/smd_rpcrouter.h>
@@ -103,12 +102,9 @@
 #define CPURATE_FOR_TOUCH_BOOSTER		1512000
 
 /* Cut out ghost ... Xtopher */
-#define MAX_GHOSTCHECK_FINGER 		10
+#define MAX_GHOSTCHECK_FINGER 		3
 #define MAX_GHOSTTOUCH_COUNT		625		// 5s, 125Hz
 #define MAX_COUNT_TOUCHSYSREBOOT	4
-#define MAX_GHOSTTOUCH_BY_PATTERNTRACKING		5
-
-#define CLEAR_MEDIAN_FILTER_ERROR
 
 #undef CPURATE_DEBUG_FOR_TSP
 
@@ -140,21 +136,6 @@ struct finger_info {
 	u16 w;
 	int16_t component;
 };
-
-
-#ifdef CLEAR_MEDIAN_FILTER_ERROR
-typedef enum
-{
-	ERR_RTN_CONDITION_T9,
-	ERR_RTN_CONDITION_T48,
-	ERR_RTN_CONDITION_IDLE,
-	ERR_RTN_CONDITION_MAX
-}ERR_RTN_CONTIOIN;
-
-ERR_RTN_CONTIOIN gErrCondition = ERR_RTN_CONDITION_IDLE;
-#endif
-
-
 
 struct mxt224_data {
 	struct i2c_client *client;
@@ -209,6 +190,9 @@ static int firm_status_data;
 static bool lock_status;
 static int touch_state; /* 1:release, 2:press, 3:others */
 static bool boot_or_resume = 1;/*1: boot_or_resume,0: others*/
+static int cghost_clear = 0;  /* ghost touch clear count  by Xtopher */
+static int ftouch_reboot = 0; 
+
 
 static int palm_chk_flag;
 static bool auto_cal_flag; /* 1: enabled,0: disabled*/
@@ -216,25 +200,20 @@ static bool ta_status_pre = 0;
 static unsigned char is_inputmethod = 0;
 
 
-/* Below is used for clearing ghost touch or for checking to system reboot.  by Xtopher */
 static int t48_jump_limit = 0;
 static int t48_mrgthr = 0;
-static int cghost_clear = 0;  /* ghost touch clear count  by Xtopher */
-static int ftouch_reboot = 0; 
-static int tcount_finger[MAX_GHOSTCHECK_FINGER] = {0,0,0,0,0,0,0,0,0,0};
-static int touchbx[MAX_GHOSTCHECK_FINGER] = {0,0,0,0,0,0,0,0,0,0};
-static int touchby[MAX_GHOSTCHECK_FINGER] = {0,0,0,0,0,0,0,0,0,0};
+
+
+static int tcount_finger[MAX_GHOSTCHECK_FINGER] = {0,0,0};
+static int touchbx[MAX_GHOSTCHECK_FINGER] = {0,0,0};
+static int touchby[MAX_GHOSTCHECK_FINGER] = {0,0,0};
 static int ghosttouchcount = 0;
-static int tsp_reboot_count = 0;
-static int cFailbyPattenTracking = 0;
+
 
 static void mxt224_optical_gain(u8 family_id, uint16_t dbg_mode);
 static void TSP_forced_release_for_call(void);
-static int tsp_pattern_tracking(int fingerindex, s16 x, s16 y);
-static void report_input_data(struct mxt224_data *data);
-static void TSP_forced_reboot(void);
 
-
+unsigned long saved_rate;					
 extern unsigned int  get_hw_rev();
 
 static int read_mem(struct mxt224_data *data, u16 reg, u8 len, u8 *buf)
@@ -495,11 +474,6 @@ static void mxt224_ta_probe(int ta_status)
 		noise_threshold = 40;
 		movfilter = 46;
 		blen = 16;
-		#ifdef CLEAR_MEDIAN_FILTER_ERROR
-		gErrCondition =  ERR_RTN_CONDITION_MAX;
-		#endif
-
-		
 	} else {
 	    if (boot_or_resume==1)
 			threshold = 55;
@@ -511,11 +485,6 @@ static void mxt224_ta_probe(int ta_status)
 		noise_threshold = 30;
 		movfilter = 11;		
 		blen = 32;		
-		#ifdef CLEAR_MEDIAN_FILTER_ERROR
-		gErrCondition =  ERR_RTN_CONDITION_IDLE;
-		#endif
-
-		
 	}
 	
 	if (copy_data->family_id==0x81) {
@@ -545,27 +514,6 @@ static void mxt224_ta_probe(int ta_status)
 		write_mem(copy_data, obj_address+(u16)register_address, size_one, &value);
 		read_mem(copy_data, obj_address+(u16)register_address, (u8)size_one, &val);
 		printk(KERN_ERR"[TSP]TA_probe MXT224E T%d Byte%d is %d\n",48,register_address,val);*/
-		
-		#ifdef CLEAR_MEDIAN_FILTER_ERROR
-		if(!ta_status)
-		{
-			ret = get_object_info(copy_data, TOUCH_MULTITOUCHSCREEN_T9, &size_one, &obj_address);
-			size_one = 1;
-			//blen
-			value = 32;
-			register_address=6;
-			write_mem(copy_data, obj_address+(u16)register_address, size_one, &value);
-			//threshold
-			value = 50;
-			register_address=7;
-			write_mem(copy_data, obj_address+(u16)register_address, size_one, &value);
-			// move Filter
-			value = 46;
-			register_address=13;
-			write_mem(copy_data, obj_address+(u16)register_address, size_one, &value);
-		}
-		#endif
-
 		
 		ret = get_object_info(copy_data, GEN_ACQUISITIONCONFIG_T8, &size_one, &obj_address);
 		size_one = 1;
@@ -1166,56 +1114,9 @@ static int diff_two_point(s16 x, s16 y, s16 oldx, s16 oldy)
 	else return 0;
 }
 
-/* Forced reboot sequence.  
-    Don't use arbitraily. 
-    if you meet special case that this routine has to be used, ask Xtopher's advice.
-*/
-static void TSP_forced_reboot(void)
-{
-	int i;
-	bool ta_status=0;
-
-	if(ftouch_reboot == 1) return;
-	ftouch_reboot  = 1;
-	printk(KERN_DEBUG "[TSP] Reboot-Touch by Pattern Tracking S\n");
-	cghost_clear = 0;
-
-	/* Below is reboot sequence   */
-	//disable_irq(copy_data->client->irq);		
-	copy_data->power_off();
-
-	for (i = 0; i < copy_data->num_fingers; i++) {
-		if (copy_data->fingers[i].z == -1)
-			continue;
-	
-		touch_is_pressed_arr[i] = 0;
-		copy_data->fingers[i].z = 0;
-	}
-	report_input_data(copy_data);
-	msleep(100);
-	copy_data->power_on();
-	msleep(10);
-
-	//enable_irq(copy_data->client->irq);
-	boot_or_resume = 1;
-	mxt224_enabled = 1;
-	qt_timer_state = 0; 
-	
-	if(copy_data->read_ta_status) {
-		copy_data->read_ta_status(&ta_status);
-		printk(KERN_ERR "[TSP] ta_status in (mxt224_late_resume) is %d", ta_status);
-		mxt224_ta_probe(ta_status);
-	}
-	calibrate_chip();
-	ftouch_reboot  = 0;
-	printk(KERN_DEBUG "[TSP] Reboot-Touch by Pattern Tracking E\n");
-
-}
-
-
 /* To do forced calibration when ghost touch occured at the same point
     for several second.   Xtopher */
-static int tsp_pattern_tracking(int fingerindex, s16 x, s16 y)
+static int check_ghost_touch(int fingerindex, s16 x, s16 y)
 {
 	int i;
 	int ghosttouch  = 0;
@@ -1239,21 +1140,11 @@ static int tsp_pattern_tracking(int fingerindex, s16 x, s16 y)
 			if(tcount_finger[i]> MAX_GHOSTTOUCH_COUNT){
 				ghosttouch = 1;
 				ghosttouchcount++;
-				printk(KERN_DEBUG "[TSP] SUNFLOWER (PATTERN TRACKING) %d\n",ghosttouchcount);
+				printk(KERN_DEBUG "[TSP] SUNFLOWER  %d\n",ghosttouchcount);
 				clear_tcount();
-
-				cFailbyPattenTracking++;
-				if(cFailbyPattenTracking > MAX_GHOSTTOUCH_BY_PATTERNTRACKING)
-				{
-					cFailbyPattenTracking = 0;
-					TSP_forced_reboot();
-				}
-				else
-				{
 				TSP_forced_release_for_call();
 			}
 		}
-	}
 	}
 	return ghosttouch;
 }
@@ -1285,15 +1176,10 @@ static void report_input_data(struct mxt224_data *data)
 
 		input_mt_sync(data->input_dev);
 
-		if (touch_is_pressed_arr[i] < 2) {
-			if (g_debug_switch)
-				printk(KERN_DEBUG "[TSP] ID-%d, %4d,%4d  UD:%d \n", i, data->fingers[i].x, data->fingers[i].y, touch_is_pressed_arr[i]);
-			else
-				printk(KERN_DEBUG "[TSP] ID-%d,UD:%d \n", i, 
-					touch_is_pressed_arr[i]);
-		}
-
-		tsp_pattern_tracking(i, data->fingers[i].x, data->fingers[i].y);
+		if (g_debug_switch)
+			printk(KERN_DEBUG "[TSP] ID-%d, %4d,%4d  UD:%d \n", i, data->fingers[i].x, data->fingers[i].y, touch_is_pressed_arr[i]);
+			
+		check_ghost_touch(i, data->fingers[i].x, data->fingers[i].y);
 
 		if(touch_is_pressed_arr[i] ==  1)
 			presscount++;
@@ -1316,12 +1202,7 @@ static void report_input_data(struct mxt224_data *data)
 			data->fingers[i].z = -1;
 	}
 	
-	/* 
-	Forced-calibration or Touch kernel reboot at power on or system wake-up.
-	This routine must be escaped from recursive calling by external ghost touch that should be
-	occured continuously.
-	Press event during move event by other finger is considered as ghost at resume.     Xtopher
-	*/
+	
 	if((cal_check_flag ==1)&& ( ftouch_reboot  == 0)&&(presscount >= 1)&&(movecount >= 1))
 	{
 		cghost_clear++;
@@ -1331,7 +1212,6 @@ static void report_input_data(struct mxt224_data *data)
 			printk(KERN_DEBUG "[TSP] Reboot-Touch S\n");
 			cghost_clear = 0;
 
-			/* Below is reboot sequence   */
 			//disable_irq(copy_data->client->irq);		
 			copy_data->power_off();
 
@@ -1349,6 +1229,7 @@ static void report_input_data(struct mxt224_data *data)
 	
 			//enable_irq(copy_data->client->irq);
 			boot_or_resume = 1;
+		
 			mxt224_enabled = 1;
 			is_inputmethod = 0;   // I know it's fault, but app couldn't solve the issue wighout this known fault.
 			qt_timer_state = 0; 
@@ -1367,7 +1248,6 @@ static void report_input_data(struct mxt224_data *data)
 			printk(KERN_DEBUG "[TSP] Clear G-Touch at Boot/Wake-up \n");
 		TSP_forced_release_for_call();
 	}
-		
 	}
 	data->finger_mask = 0;
     touch_state=0;
@@ -1440,36 +1320,6 @@ void palm_recovery(void)
 }
 
 
-#ifdef CLEAR_MEDIAN_FILTER_ERROR
-ERR_RTN_CONTIOIN Check_Err_Condition(bool ta)
-{
-	ERR_RTN_CONTIOIN rtn;
-
-	if(ta)
-	{
-		rtn = ERR_RTN_CONDITION_MAX;
-	}
-	else
-	{
-		switch(gErrCondition)
-		{
-			case ERR_RTN_CONDITION_IDLE:
-				rtn = ERR_RTN_CONDITION_T9;
-				break;
-
-			case ERR_RTN_CONDITION_T9:
-				rtn = ERR_RTN_CONDITION_T48;
-				break;
-
-			case ERR_RTN_CONDITION_T48:
-				rtn = ERR_RTN_CONDITION_IDLE;
-				break;
-		}
-	}
-	return rtn;
-}
-#endif
-
 static irqreturn_t mxt224_irq_thread(int irq, void *ptr)
 {
 	struct mxt224_data *data = ptr;
@@ -1479,7 +1329,6 @@ static irqreturn_t mxt224_irq_thread(int irq, void *ptr)
 	u8 value, size_one,ret;
 	u16 obj_address = 0;
 	unsigned int register_address = 0;
-	bool ta_status=0;
 	
 	disable_irq_nosync(irq);
 
@@ -1535,97 +1384,6 @@ static irqreturn_t mxt224_irq_thread(int irq, void *ptr)
 				calibrate_chip();
 		}
 		
-		#ifdef CLEAR_MEDIAN_FILTER_ERROR
-		if((msg[0] == 18) && (data->family_id==0x81)){
-			if((msg[4]&0x5) == 0x5){
-				printk(KERN_ERR"[TSP] median filter state error!!!\n");
-
-					data->read_ta_status(&ta_status);
-
-				
-				gErrCondition = Check_Err_Condition(ta_status);
-
-				switch(gErrCondition)
-				{
-					case ERR_RTN_CONDITION_T9:
-					{
-							//t9
-						ret = get_object_info(data, TOUCH_MULTITOUCHSCREEN_T9, &size_one, &obj_address);
-						size_one = 1;
-						//blen
-						value = 16;
-						register_address=6;
-						write_mem(data, obj_address+(u16)register_address, size_one, &value);
-					
-						//threshold
-						value = 40;
-						register_address=7;
-						write_mem(data, obj_address+(u16)register_address, size_one, &value);
-					
-					
-						// move Filter
-						value = 47;
-						register_address=13;
-						write_mem(data, obj_address+(u16)register_address, size_one, &value);
-					
-					}
-						break;
-
-					case ERR_RTN_CONDITION_T48:
-				{
-							// t48
-				ret = get_object_info(data, PROCG_NOISESUPPRESSION_T48, &size_one, &obj_address);
-				size_one = 1;
-
-						// Base Frq modify
-						register_address=3; 
-						value = 29;
-						write_mem(data, obj_address+(u16)register_address, size_one, &value);	
-					}
-						break;
-
-					case ERR_RTN_CONDITION_IDLE:
-						{
-							// t9
-							ret = get_object_info(data, TOUCH_MULTITOUCHSCREEN_T9, &size_one, &obj_address);
-							//blen INIT
-							value = 32;
-							register_address=6;
-							write_mem(data, obj_address+(u16)register_address, 1, &value);
-							//threshold INIT
-							value = 50;
-							register_address=7;
-							write_mem(data, obj_address+(u16)register_address, 1, &value);
-							// move Filter INIT
-							value = 46;
-							register_address=13;
-							write_mem(data, obj_address+(u16)register_address, 1, &value);
-
-							// t48
-							ret = get_object_info(data, PROCG_NOISESUPPRESSION_T48, &size_one, &obj_address);
-							// Base Frq modify INIT
-							register_address=3; 
-							value = 0;
-							write_mem(data, obj_address+(u16)register_address, 1, &value);	
-						}
-						break;
-				}
-				
-				// t48
-				ret = get_object_info(data, PROCG_NOISESUPPRESSION_T48, &size_one, &obj_address);
-				size_one = 1;
-				register_address=2;
-				read_mem(data, obj_address+(u16)register_address, size_one, &value);
-				printk(KERN_ERR"[TSP]TA_probe MXT224E T%d Byte%d is %d\n",48,register_address,value);
-				value = value & 0xDF;
-				write_mem(data, obj_address+(u16)register_address, size_one, &value);
-				mdelay(5);
-				value = value | 0x20;
-				write_mem(data, obj_address+(u16)register_address, size_one, &value);
-
-			}
-		}
-		#else // ORIGINAL
 		if((msg[0] == 18) && (data->family_id==0x81)){
 			if((msg[4]&0x5) == 0x5){
 				printk(KERN_ERR"[TSP] median filter state error!!!\n");
@@ -1642,9 +1400,6 @@ static irqreturn_t mxt224_irq_thread(int irq, void *ptr)
 					
 			}
 		}		
-		#endif
-
-		
 		
 		if (msg[0] > 1 && msg[0] <12){
 
@@ -2006,6 +1761,10 @@ void TSP_forced_release_for_call(void)
 
 		if (copy_data->fingers[i].z == -1) continue;
 
+		msleep(20);
+		calibrate_chip();
+		msleep(20); 
+
 		input_report_abs(copy_data->input_dev, ABS_MT_POSITION_X, copy_data->fingers[i].x);
 		input_report_abs(copy_data->input_dev, ABS_MT_POSITION_Y, copy_data->fingers[i].y);
 		input_report_abs(copy_data->input_dev, ABS_MT_TOUCH_MAJOR, copy_data->fingers[i].z);
@@ -2021,10 +1780,6 @@ void TSP_forced_release_for_call(void)
 		if (copy_data->fingers[i].z == 0)
 			copy_data->fingers[i].z = -1;
 	}
-
-	calibrate_chip();
-	msleep(20); 
-
 	copy_data->finger_mask = 0;
 	touch_state = 0;
 	input_sync(copy_data->input_dev);
@@ -3395,13 +3150,9 @@ static int __devinit mxt224_probe(struct i2c_client *client, const struct i2c_de
 	u16 size_one;
 	u8 user_info_value;
 	u16 obj_address;
-
+	int tsp_reboot_count = 0;
 
 tsp_reinit:;
-
-
-	if( 0==sec_debug_is_enabled() )
-		g_debug_switch = 0;
 
 	touch_is_pressed = 0;
 	printk(KERN_ERR "[TSP] mxt224_probe   \n");

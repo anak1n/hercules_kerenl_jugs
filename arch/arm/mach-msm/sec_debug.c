@@ -581,8 +581,7 @@ static int sec_debug_panic_handler(struct notifier_block *nb,
 	sec_debug_set_upload_magic(0x776655ee);
 
 	if (!enable) {
-		/* reset is moved to panic() function */
-//		sec_debug_hw_reset();
+		sec_debug_hw_reset();
 		return -1;
 	}
 
@@ -607,8 +606,7 @@ static int sec_debug_panic_handler(struct notifier_block *nb,
 
 	sec_debug_dump_stack();
 	charm_assert_panic();
-	/* reset is moved to panic() function */
-//	sec_debug_hw_reset();
+	sec_debug_hw_reset();
 
 	return 0;
 }
@@ -780,7 +778,7 @@ __init int sec_debug_init(void)
 	return 0;
 }
 
-int sec_debug_is_enabled(void)
+int sec_debug_level(void)
 {
 	return enable;
 }
@@ -1366,6 +1364,32 @@ static const struct file_operations sec_reset_reason_proc_fops = {
 	.llseek		= seq_lseek,
 	.release	= single_release,
 };
+
+#if defined(CONFIG_SEC_DEBUG)
+#define MAX_DEBUG_LIST_INDEX 	1024
+#define DEBUG_INDEX_MASK		0x3FF
+
+typedef struct
+{
+	unsigned long mListAddr;
+	unsigned long mCallerAddr;
+	pid_t mPid;
+}secDebugList;
+
+static secDebugList g_SecDebugList[MAX_DEBUG_LIST_INDEX];
+static int gSecDebugListIndex = 0;
+
+void sec_debug_list(void *entry)
+{
+	gSecDebugListIndex = (gSecDebugListIndex+1) & DEBUG_INDEX_MASK;
+	
+	g_SecDebugList[gSecDebugListIndex].mListAddr = (int)entry;
+	g_SecDebugList[gSecDebugListIndex].mCallerAddr = (unsigned long)__builtin_return_address(0);
+	g_SecDebugList[gSecDebugListIndex].mPid = current->pid;
+
+}
+EXPORT_SYMBOL(sec_debug_list);
+#endif
 
 static int __init sec_debug_reset_reason_init(void)
 {

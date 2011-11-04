@@ -1114,7 +1114,7 @@ static void msm_snddev_disable_audience_amic_power(void)
 	a2220_ioctl2(A2220_SET_CONFIG , A2220_PATH_SUSPEND);	
 	gpio_set_value(GPIO_SELECT_I2S_AUDIENCE_QTR, 1); //switch  to I2S QTR
 	pr_debug("[AUD] QTR Path \n");
-#elif defined (CONFIG_USA_MODEL_SGH_I717)
+#elif defined(CONFIG_USA_MODEL_SGH_I727) || defined (CONFIG_USA_MODEL_SGH_I717)
 	a2220_ioctl2(A2220_SET_CONFIG , A2220_PATH_INCALL_RECEIVER_NSOFF);	
 	pr_debug("[AUD] AUD Path \n");
 #endif 	
@@ -1491,7 +1491,7 @@ ADIE_HEADSET_CALL_RX_48000_256;
 static struct adie_codec_action_unit headset_call_tx_48KHz_osr256_actions[] =
 ADIE_HEADSET_CALL_TX_48000_256;
 
-#if defined (CONFIG_KOR_MODEL_SHV_E110S) || defined (CONFIG_KOR_MODEL_SHV_E120S) || defined(CONFIG_USA_MODEL_SGH_I727)
+#if defined (CONFIG_KOR_MODEL_SHV_E110S) || defined (CONFIG_KOR_MODEL_SHV_E120S)
 static struct adie_codec_action_unit headset_loopback_tx_48KHz_osr256_actions[] =
 ADIE_HEADSET_LOOPBACK_TX_48000_256;
 #endif 
@@ -1889,7 +1889,7 @@ static struct adie_codec_hwsetting_entry headset_call_tx_settings[] = {
 	}
 };
 
-#if defined (CONFIG_KOR_MODEL_SHV_E110S) || defined (CONFIG_KOR_MODEL_SHV_E120S) || defined(CONFIG_USA_MODEL_SGH_I727) 
+#if defined (CONFIG_KOR_MODEL_SHV_E110S) || defined (CONFIG_KOR_MODEL_SHV_E120S) 
 static struct adie_codec_hwsetting_entry headset_loopback_tx_settings[] = {
 	{
 		.freq_plan = 48000,
@@ -2191,7 +2191,7 @@ static struct adie_codec_dev_profile headset_call_tx_profile = {
 	.setting_sz = ARRAY_SIZE(headset_call_tx_settings),
 };
 
-#if defined (CONFIG_KOR_MODEL_SHV_E110S) || defined (CONFIG_KOR_MODEL_SHV_E120S) || defined(CONFIG_USA_MODEL_SGH_I727)
+#if defined (CONFIG_KOR_MODEL_SHV_E110S) || defined (CONFIG_KOR_MODEL_SHV_E120S)
 static struct adie_codec_dev_profile headset_loopback_tx_profile = {
 	.path_type = ADIE_CODEC_TX,
 	.settings = headset_loopback_tx_settings,
@@ -2898,7 +2898,7 @@ static struct snddev_icodec_data headset_loopback_tx_data = {
 	.name = "headset_loopback_tx",
 	.copp_id = PRIMARY_I2S_TX,
 	
-	#if defined (CONFIG_KOR_MODEL_SHV_E110S) || defined (CONFIG_KOR_MODEL_SHV_E120S) || defined(CONFIG_USA_MODEL_SGH_I727)
+	#if defined (CONFIG_KOR_MODEL_SHV_E110S) || defined (CONFIG_KOR_MODEL_SHV_E120S)
     .profile = &headset_loopback_tx_profile,
 	#else
     .profile = &headset_call_tx_profile,

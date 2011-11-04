@@ -121,7 +121,9 @@ NORET_TYPE void panic(const char * fmt, ...)
 
 	bust_spinlocks(0);
 
+#if 0
 	sec_debug_hw_reset();
+#endif
 
 	if (panic_timeout > 0) {
 		/*

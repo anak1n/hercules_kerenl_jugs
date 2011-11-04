@@ -720,7 +720,7 @@ static ssize_t k3g_power_off(struct device *dev,
 	GPIO_GYRO_CONFIG
 #endif
 
-	buffer[0] = 0x60;// power_down mode
+	buffer[0] = 0x68;// power_down mode
 	buffer[1] = 0x00;
 	buffer[2] = 0x00;
 	buffer[3] = 0x00;
@@ -1315,7 +1315,7 @@ static int k3g_probe(struct i2c_client *client,  const struct i2c_device_id *dev
 	return 0;
 
 device_create_file7:
-device_remove_file(data->dev, &dev_attr_gyro_selftest_dps);
+device_remove_file(data->dev, &dev_attr_gyro_power_off);
 device_create_file6:
 	device_remove_file(data->dev, &dev_attr_gyro_selftest);
 device_create_file5:

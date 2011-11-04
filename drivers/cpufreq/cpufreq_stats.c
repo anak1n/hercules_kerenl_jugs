@@ -38,7 +38,6 @@ struct cpufreq_stats {
 	unsigned int state_num;
 	unsigned int last_index;
 	cputime64_t *time_in_state;
-	cputime64_t *percentage;
 	unsigned int *freq_table;
 #ifdef CONFIG_CPU_FREQ_STAT_DETAILS
 	unsigned int *trans_table;
@@ -64,10 +63,6 @@ static int cpufreq_stats_update(unsigned int cpu)
 		stat->time_in_state[stat->last_index] =
 			cputime64_add(stat->time_in_state[stat->last_index],
 				      cputime_sub(cur_time, stat->last_time));
-	if (stat->percentage)
-		stat->percentage[stat->last_index] =
-			cputime64_add(stat->percentage[stat->last_index],
-				      cputime_sub(cur_time, stat->last_time));
 	stat->last_time = cur_time;
 	spin_unlock(&cpufreq_stats_lock);
 	return 0;
@@ -81,46 +76,6 @@ static ssize_t show_total_trans(struct cpufreq_policy *policy, char *buf)
 	return sprintf(buf, "%d\n",
 			per_cpu(cpufreq_stats_table, stat->cpu)->total_trans);
 }
-
-static ssize_t store_percentage(struct cpufreq_policy *policy,
-		const char *buf, size_t count)
-{
-	int i;
-	struct cpufreq_stats *stat = per_cpu(cpufreq_stats_table, policy->cpu);
-	if (!stat)
-		return 0;
-	cpufreq_stats_update(stat->cpu);
-	for (i = 0; i < stat->state_num; i++)
-		stat->percentage[i] = 0;
-	return count;
-}
-
-static ssize_t show_percentage(struct cpufreq_policy *policy, char *buf)
-{
-	ssize_t len = 0;
-	int i;
-	unsigned long sum = 0;
-	struct cpufreq_stats *stat = per_cpu(cpufreq_stats_table, policy->cpu);
-	if (!stat)
-		return 0;
-	cpufreq_stats_update(stat->cpu);
-	for (i = 0; i < stat->state_num; i++)
-		sum += cputime64_to_clock_t(stat->percentage[i]);
-	for (i = 0; i < stat->state_num; i++) {
-		len += sprintf(buf + len, "%u %llu %lu%%\n", stat->freq_table[i],
-			(unsigned long long)
-			cputime64_to_clock_t(stat->percentage[i]),
-			(((unsigned long)
-			cputime64_to_clock_t(stat->percentage[i])) * 100 + 1) / sum);
-	}
-	return len;
-}
-
-static struct freq_attr _attr_percentage = {\
-	.attr = {.name = __stringify(percentage), .mode = 0644,},
-	.show = show_percentage,
-	.store = store_percentage,
-};
 
 static ssize_t show_time_in_state(struct cpufreq_policy *policy, char *buf)
 {
@@ -191,7 +146,6 @@ CPUFREQ_STATDEVICE_ATTR(time_in_state, 0444, show_time_in_state);
 static struct attribute *default_attrs[] = {
 	&_attr_total_trans.attr,
 	&_attr_time_in_state.attr,
-	&_attr_percentage.attr,
 #ifdef CONFIG_CPU_FREQ_STAT_DETAILS
 	&_attr_trans_table.attr,
 #endif
@@ -270,7 +224,7 @@ static int cpufreq_stats_create_table(struct cpufreq_policy *policy,
 		count++;
 	}
 
-	alloc_size = count * sizeof(int) + 2 * count * sizeof(cputime64_t);
+	alloc_size = count * sizeof(int) + count * sizeof(cputime64_t);
 
 #ifdef CONFIG_CPU_FREQ_STAT_DETAILS
 	alloc_size += count * count * sizeof(int);
@@ -281,8 +235,7 @@ static int cpufreq_stats_create_table(struct cpufreq_policy *policy,
 		ret = -ENOMEM;
 		goto error_out;
 	}
-	stat->percentage = (cputime64_t *)(stat->time_in_state + count);
-	stat->freq_table = (unsigned int *)(stat->time_in_state + 2 * count);
+	stat->freq_table = (unsigned int *)(stat->time_in_state + count);
 
 #ifdef CONFIG_CPU_FREQ_STAT_DETAILS
 	stat->trans_table = stat->freq_table + count;

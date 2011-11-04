@@ -375,6 +375,7 @@ static int load_ampgain(void)
 		g_ampgain[4].bSpNcpl_ReleaseTime = 1;	/* SP Non-Clip power limiter : release Time */
 	
 #elif defined (CONFIG_USA_MODEL_SGH_I727) || defined (CONFIG_USA_MODEL_SGH_I717)
+	g_ampgain[3].sp_gainup = 2;
 	g_ampgain[3].bSpNg_DetectionLv = 4;
 
 		g_ampgain[0].bSpNg_DetectionLv = 0;
@@ -399,7 +400,7 @@ static int load_ampgain(void)
 		g_ampgain[2].bSpNcpl_ReleaseTime = 1;	/* SP Non-Clip power limiter : release Time */
 
 		g_ampgain[3].bSpNg_AttackTime = 1;		/* SP Noise Gate : attack time */
-		g_ampgain[3].bSpNcpl_NonClipRatio = 0;	/* SP Non-Clip power limiter : Non-Clip distortion ratio */
+		g_ampgain[3].bSpNcpl_NonClipRatio = 1;	/* SP Non-Clip power limiter : Non-Clip distortion ratio */
 		g_ampgain[3].bSpNcpl_PowerLimit = 0;	/* SP Non-Clip power limiter : Power Limit */
 		g_ampgain[3].bSpNcpl_AttackTime = 1;	/* SP Non-Clip power limiter : attack Time */
 		g_ampgain[3].bSpNcpl_ReleaseTime = 1;	/* SP Non-Clip power limiter : release Time */
@@ -1534,6 +1535,10 @@ void yda165_speaker_call_onoff(int onoff) /* speaker path amp onoff */
 		if(get_hw_rev() < 0x5)
 			stInfo.bHpAvddLev = 0;
 		else
+#elif defined (CONFIG_KOR_MODEL_SHV_E110S) || defined (CONFIG_KOR_MODEL_SHV_E120S) || defined (CONFIG_KOR_MODEL_SHV_E120K) || defined (CONFIG_JPN_MODEL_SC_03D)
+		if(get_hw_rev() < 0x4) // rev0.3
+			stInfo.bHpAvddLev = 0;
+		else
 #elif defined (CONFIG_USA_MODEL_SGH_I727)
 		if(get_hw_rev() < 0x6) // rev0.6
 			stInfo.bHpAvddLev = 0;
@@ -1638,6 +1643,10 @@ void yda165_headset_call_onoff(int onoff) /* headset path amp onoff */
 		
 #if defined (CONFIG_USA_MODEL_SGH_T989)
 		if(get_hw_rev() < 0x5)
+			stInfo.bHpAvddLev = 0;
+		else
+#elif defined (CONFIG_KOR_MODEL_SHV_E110S) || defined (CONFIG_KOR_MODEL_SHV_E120S) || defined (CONFIG_KOR_MODEL_SHV_E120K) || defined (CONFIG_JPN_MODEL_SC_03D)
+		if(get_hw_rev() < 0x4) // rev0.3
 			stInfo.bHpAvddLev = 0;
 		else
 #elif defined (CONFIG_USA_MODEL_SGH_I727)
